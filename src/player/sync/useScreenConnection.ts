@@ -13,7 +13,8 @@ import {
   type PlayerManifest,
 } from "@/player/offline/store";
 
-const APP_VERSION = "0.2.0";
+const APP_VERSION = "0.3.0";
+const CLOCK_KEY = "signage-clock-offset";
 const PAIRING_INTERVAL = 3_000;
 const HEARTBEAT_INTERVAL = 30_000;
 const RETRY_INTERVAL = 5_000;
@@ -32,6 +33,7 @@ export interface ScreenConnection {
   audio: AudioState;
   setAudio: (state: AudioState) => void;
   manifest: PlayerManifest | null;
+  clockOffset: number;
 }
 
 interface PairingResult {
@@ -50,6 +52,7 @@ export function useScreenConnection(): ScreenConnection {
   const [isIdentifying, setIsIdentifying] = useState(false);
   const [audio, setAudio] = useState<AudioState>("unknown");
   const [manifest, setManifest] = useState<PlayerManifest | null>(null);
+  const [clockOffset, setClockOffset] = useState(0);
 
   useEffect(() => {
     if (!supabaseUrl || !supabaseKey) {
@@ -70,6 +73,10 @@ export function useScreenConnection(): ScreenConnection {
     let activeVersion: string | null = null;
     let syncing = false;
     let contentState: Record<string, unknown> = { status: "idle" };
+
+    // آخر فرق معروف عن ساعة الخادم يبقى صالحًا عند انقطاع الإنترنت
+    const storedOffset = Number(window.localStorage.getItem(CLOCK_KEY));
+    if (Number.isFinite(storedOffset)) setClockOffset(storedOffset);
 
     void loadActiveManifest()
       .then((stored) => {
@@ -237,6 +244,13 @@ export function useScreenConnection(): ScreenConnection {
       });
       if (heartbeat.error) throw heartbeat.error;
 
+      const serverTime = (heartbeat.data as { server_time_ms?: number }).server_time_ms;
+      if (typeof serverTime === "number") {
+        const offset = serverTime - Date.now();
+        window.localStorage.setItem(CLOCK_KEY, String(offset));
+        setClockOffset(offset);
+      }
+
       if (!(heartbeat.data as { paired: boolean }).paired) {
         setPhase("disabled");
         return HEARTBEAT_INTERVAL;
@@ -299,5 +313,5 @@ export function useScreenConnection(): ScreenConnection {
     };
   }, []);
 
-  return { phase, code, screenId, screenName, location, isConnected, isIdentifying, audio, setAudio, manifest };
+  return { phase, code, screenId, screenName, location, isConnected, isIdentifying, audio, setAudio, manifest, clockOffset };
 }

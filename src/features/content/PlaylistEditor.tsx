@@ -12,12 +12,14 @@ const DEFAULT_SECONDS = 8;
 export function PlaylistEditor({
   orgId,
   playlist,
+  contractId,
   items,
   assets,
   screens,
 }: {
   orgId: string;
   playlist: NamedOption;
+  contractId: string | null;
   items: PlaylistItem[];
   assets: MediaAsset[];
   screens: AssignableScreen[];
@@ -102,7 +104,9 @@ export function PlaylistEditor({
 
   async function publish() {
     setBusy(true);
-    const { data, error } = await supabase().rpc("request_playlist_resync", { p_playlist: playlist.id });
+    const { data, error } = contractId
+      ? await supabase().rpc("request_contract_resync", { p_contract: contractId })
+      : await supabase().rpc("request_playlist_resync", { p_playlist: playlist.id });
     setBusy(false);
     setStatus(
       error
@@ -115,7 +119,11 @@ export function PlaylistEditor({
 
   return (
     <main className="page">
-      <p className="page-note"><Link href="/playlists">قوائم العرض</Link></p>
+      <p className="page-note">
+        <Link href={contractId ? `/contracts/${contractId}` : "/playlists"}>
+          {contractId ? "العودة إلى العقد" : "قوائم العرض"}
+        </Link>
+      </p>
       <h1>{playlist.name}</h1>
 
       {items.length === 0 ? (
@@ -128,7 +136,7 @@ export function PlaylistEditor({
               <li key={item.id}>
                 {asset ? <MediaThumb asset={asset} /> : <div className="thumb thumb-text">نص</div>}
                 <div className="item-main">
-                  <strong>{asset?.name ?? item.body}</strong>
+                  <strong>{asset?.name ?? item.body ?? "ملف"}</strong>
                   {item.kind === "video" ? (
                     <span>يعمل حتى نهاية الفيديو</span>
                   ) : (
@@ -190,30 +198,32 @@ export function PlaylistEditor({
         <button className="button-quiet-blue" disabled={busy}>إضافة النص</button>
       </form>
 
-      <section className="assign-section">
-        <h2>اعرض هذه القائمة على</h2>
-        {screens.length === 0 ? (
-          <p className="page-note">لا توجد شاشات مربوطة بعد.</p>
-        ) : (
-          <ul className="assign-list">
-            {screens.map((screen) => {
-              const showing = screen.playlist_id === playlist.id;
-              return (
-                <li key={screen.id}>
-                  <span>{screen.name ?? "شاشة بلا اسم"}</span>
-                  <button
-                    className={showing ? "button-quiet-blue" : "button-scan"}
-                    disabled={busy}
-                    onClick={() => toggleScreen(screen)}
-                  >
-                    {showing ? "إيقاف" : "عرض"}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+      {!contractId && (
+        <section className="assign-section">
+          <h2>اعرض هذه القائمة على</h2>
+          {screens.length === 0 ? (
+            <p className="page-note">لا توجد شاشات مربوطة بعد.</p>
+          ) : (
+            <ul className="assign-list">
+              {screens.map((screen) => {
+                const showing = screen.playlist_id === playlist.id;
+                return (
+                  <li key={screen.id}>
+                    <span>{screen.name ?? "شاشة بلا اسم"}</span>
+                    <button
+                      className={showing ? "button-quiet-blue" : "button-scan"}
+                      disabled={busy}
+                      onClick={() => toggleScreen(screen)}
+                    >
+                      {showing ? "إيقاف" : "عرض"}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+      )}
 
       {status && <p className="page-note" role="status">{status}</p>}
       <button className="button-primary" disabled={busy} onClick={publish}>تحديث الشاشات الآن</button>

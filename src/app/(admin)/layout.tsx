@@ -9,11 +9,15 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     <div className="admin">
       <header className="admin-header">
         <Link href="/dashboard">{org.name}</Link>
-        <SignOutButton />
+        <div className="admin-header-actions">
+          <Link href="/settings">الإعدادات</Link>
+          <SignOutButton />
+        </div>
       </header>
       <nav className="admin-nav" aria-label="أقسام لوحة التحكم">
         <Link href="/dashboard">الشاشات</Link>
-        <Link href="/playlists">قوائم العرض</Link>
+        <Link href="/contracts">العقود</Link>
+        <Link href="/playlists">القوائم</Link>
         <Link href="/media">الوسائط</Link>
       </nav>
       {children}

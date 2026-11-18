@@ -6,8 +6,10 @@ import { supabaseKey, supabaseUrl } from "@/lib/supabase/config";
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // الشاشة تدير جلستها بنفسها داخل المتصفح
-  if (pathname === "/play" || pathname.startsWith("/play/")) return NextResponse.next();
+  // الشاشة والمستأجر يديران جلستهما داخل المتصفح
+  if (pathname === "/play" || pathname.startsWith("/play/") || pathname.startsWith("/r/")) {
+    return NextResponse.next();
+  }
 
   let response = NextResponse.next({ request });
   const supabase = createServerClient(supabaseUrl, supabaseKey, {

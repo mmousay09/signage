@@ -1,36 +1,41 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { getAssetUrl, type PlayerManifest } from "@/player/offline/store";
+import { getAssetUrl, type ManifestProgram } from "@/player/offline/store";
 
 const VIDEO_GRACE_MS = 15_000;
 const VIDEO_FALLBACK_MS = 5 * 60_000;
 const DEFAULT_ITEM_MS = 8_000;
 
-export function ContentStage({ manifest }: { manifest: PlayerManifest }) {
-  const latest = useRef(manifest);
-  const [playback, setPlayback] = useState({ manifest, index: 0, tick: 0 });
+export interface StageContent {
+  version: string;
+  organization: string;
+  program: ManifestProgram;
+}
+
+export function ContentStage({ content }: { content: StageContent }) {
+  const latest = useRef(content);
+  const [playback, setPlayback] = useState({ content, index: 0, tick: 0 });
   const [media, setMedia] = useState<{ itemId: string; url: string | null } | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // النسخة الجديدة تبدأ عند نهاية العنصر الحالي، لا في منتصفه
+  // النسخة الجديدة من نفس البرنامج تبدأ عند نهاية العنصر الحالي
   const advance = () =>
     setPlayback((current) => {
       const next = latest.current;
-      if (next.version !== current.manifest.version) return { manifest: next, index: 0, tick: current.tick + 1 };
-      const count = current.manifest.program.items.length;
+      if (next.version !== current.content.version) return { content: next, index: 0, tick: current.tick + 1 };
+      const count = current.content.program.items.length;
       return { ...current, index: (current.index + 1) % count, tick: current.tick + 1 };
     });
   const advanceRef = useRef(advance);
   advanceRef.current = advance;
 
-  const { items, layout } = playback.manifest.program;
+  const { items, layout } = playback.content.program;
   const item = items[playback.index % items.length];
 
   useEffect(() => {
-    latest.current = manifest;
-    if (playback.manifest.program.items.length === 0) advanceRef.current();
-  }, [manifest, playback.manifest.program.items.length]);
+    latest.current = content;
+  }, [content]);
 
   useEffect(() => {
     let active = true;
@@ -84,7 +89,7 @@ export function ContentStage({ manifest }: { manifest: PlayerManifest }) {
     >
       {layout.position !== "none" && (
         <aside className="avatar-zone">
-          <span>{playback.manifest.organization}</span>
+          <span>{playback.content.organization}</span>
         </aside>
       )}
       <section className="content-zone">

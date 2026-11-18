@@ -3,12 +3,16 @@ import type { MediaAsset } from "./types";
 
 type ServerClient = Awaited<ReturnType<typeof createClient>>;
 
-export async function loadMedia(supabase: ServerClient, orgId: string): Promise<MediaAsset[]> {
+export async function loadMedia(
+  supabase: ServerClient,
+  orgId: string,
+  contractId?: string | null,
+): Promise<MediaAsset[]> {
   const { data } = await supabase
     .from("media_assets")
     .select("id, org_id, kind, name, storage_path, mime_type, size_bytes, duration_ms")
     .eq("org_id", orgId)
-    .is("contract_id", null)
+    .or(contractId ? `contract_id.is.null,contract_id.eq.${contractId}` : "contract_id.is.null")
     .in("kind", ["image", "video"])
     .order("created_at", { ascending: false });
   const assets = (data ?? []) as Omit<MediaAsset, "url">[];

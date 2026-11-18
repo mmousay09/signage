@@ -16,13 +16,27 @@ export interface ManifestItem {
   asset: ManifestAsset | null;
 }
 
+export interface ManifestProgram {
+  layout: { position: "top" | "bottom" | "none"; percent: number };
+  items: ManifestItem[];
+}
+
+export interface ManifestContract {
+  id: string;
+  title: string;
+  starts_at: string;
+  ends_at: string;
+  program: ManifestProgram;
+}
+
 export interface PlayerManifest {
   version: string;
   organization: string;
-  program: {
-    layout: { position: "top" | "bottom" | "none"; percent: number };
-    items: ManifestItem[];
-  };
+  contact_phone?: string | null;
+  fallback_headline?: string;
+  idle?: ManifestProgram | null;
+  contracts?: ManifestContract[];
+  program: ManifestProgram;
 }
 
 const MEDIA_CACHE = "signage-media-v1";
@@ -53,9 +67,12 @@ export async function installManifest(
 ) {
   const cache = await caches.open(MEDIA_CACHE);
   const assets = new Map<string, ManifestAsset>();
-  manifest.program.items.forEach((item) => {
-    if (item.asset) assets.set(item.asset.id, item.asset);
-  });
+  [manifest.program, manifest.idle, ...(manifest.contracts ?? []).map((contract) => contract.program)].forEach(
+    (program) =>
+      program?.items.forEach((item) => {
+        if (item.asset) assets.set(item.asset.id, item.asset);
+      }),
+  );
 
   let ready = 0;
   onProgress(ready, assets.size);

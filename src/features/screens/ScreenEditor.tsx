@@ -96,9 +96,9 @@ export function ScreenEditor({
           <input name="location" maxLength={120} defaultValue={screen.location ?? ""} />
         </label>
         <label>
-          قائمة العرض
+          المحتوى خارج فترات الإيجار
           <select name="playlist_id" defaultValue={screen.playlist_id ?? ""}>
-            <option value="">دون قائمة</option>
+            <option value="">إعلان «متاحة للإيجار»</option>
             {playlists.map((playlist) => (
               <option key={playlist.id} value={playlist.id}>{playlist.name}</option>
             ))}

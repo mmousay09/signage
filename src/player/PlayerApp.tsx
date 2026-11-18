@@ -2,17 +2,28 @@
 
 import { QrCode } from "@/components/ui/QrCode";
 import { pairingUrl, screenUrl } from "@/lib/screen-links";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { unlockAudio } from "@/player/audio/audio";
+import { resolveContent } from "@/player/engine/schedule";
 import { registerPlayerWorker } from "@/player/offline/store";
 import { useScreenConnection } from "@/player/sync/useScreenConnection";
 import { ContentStage } from "@/player/zones/ContentStage";
 
 export function PlayerApp() {
   const screen = useScreenConnection();
-  const hasContent =
-    Boolean(screen.manifest?.program.items.length) &&
-    (screen.phase === "starting" || screen.phase === "ready");
+  const [clock, setClock] = useState(() => Date.now());
+  const showsManifest =
+    Boolean(screen.manifest) && (screen.phase === "starting" || screen.phase === "ready");
+  const resolved =
+    showsManifest && screen.manifest
+      ? resolveContent(screen.manifest, clock + screen.clockOffset)
+      : null;
+  const hasContent = Boolean(resolved);
+
+  useEffect(() => {
+    const timer = setInterval(() => setClock(Date.now()), 1_000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     void registerPlayerWorker();
@@ -29,7 +40,34 @@ export function PlayerApp() {
     <main className="player" data-phase={screen.phase} onPointerDown={handleTouch}>
       <audio id="player-chime" src="/sounds/chime.wav" preload="auto" />
 
-      {hasContent && screen.manifest && <ContentStage manifest={screen.manifest} />}
+      {resolved?.kind === "program" && screen.manifest && (
+        <ContentStage
+          key={resolved.key}
+          content={{
+            version: resolved.version,
+            organization: screen.manifest.organization,
+            program: resolved.program,
+          }}
+        />
+      )}
+
+      {resolved?.kind === "contract-empty" && (
+        <section className="available">
+          <h1>{resolved.title}</h1>
+        </section>
+      )}
+
+      {resolved?.kind === "available" && screen.manifest && (
+        <section className="available">
+          <small>{screen.manifest.organization}</small>
+          <h1>{screen.manifest.fallback_headline ?? "هذه الشاشة متاحة للإيجار"}</h1>
+          {screen.manifest.contact_phone && (
+            <p>
+              للتواصل <bdi dir="ltr">{screen.manifest.contact_phone}</bdi>
+            </p>
+          )}
+        </section>
+      )}
 
       {screen.phase === "starting" && !hasContent && <p className="player-note">جارٍ تشغيل الشاشة</p>}
 
