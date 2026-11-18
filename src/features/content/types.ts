@@ -27,6 +27,12 @@ export interface NamedOption {
   name: string;
 }
 
+export interface AssignableScreen {
+  id: string;
+  name: string | null;
+  playlist_id: string | null;
+}
+
 export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 export const formatSize = (bytes: number) =>
   bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.ceil(bytes / 1024)} KB`;

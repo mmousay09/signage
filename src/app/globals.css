@@ -172,6 +172,11 @@
     border-radius: 0.4rem;
     background: #fff;
   }
+  .assign-section { display: grid; gap: 0.75rem; }
+  .assign-section h2 { margin: 0; font-size: 1.15rem; font-weight: 600; }
+  .assign-list { display: grid; border-top: 2px solid var(--color-route); }
+  .assign-list li { display: grid; grid-template-columns: minmax(0, 1fr) 5.5rem; gap: 0.75rem; align-items: center; padding: 0.6rem 0; border-bottom: 1px solid #d6dce7; }
+  .assign-list button { min-height: 2.75rem; }
   .link-list { border-top: 2px solid var(--color-route); }
   .link-list a { display: block; padding: 1rem 0; border-bottom: 1px solid #d6dce7; color: inherit; font-weight: 500; text-decoration: none; }
   .playlist-items { display: grid; margin: 0; padding: 0; list-style: none; border-top: 2px solid var(--color-route); }

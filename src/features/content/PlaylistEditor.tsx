@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import { MediaThumb } from "./MediaThumb";
-import type { MediaAsset, NamedOption, PlaylistItem } from "./types";
+import type { AssignableScreen, MediaAsset, NamedOption, PlaylistItem } from "./types";
 
 const DEFAULT_SECONDS = 8;
 
@@ -14,11 +14,13 @@ export function PlaylistEditor({
   playlist,
   items,
   assets,
+  screens,
 }: {
   orgId: string;
   playlist: NamedOption;
   items: PlaylistItem[];
   assets: MediaAsset[];
+  screens: AssignableScreen[];
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<string | null>(null);
@@ -81,6 +83,21 @@ export function PlaylistEditor({
     void run(() =>
       supabase().from("playlist_items").update({ duration_ms: seconds * 1000 }).eq("id", item.id),
     );
+  }
+
+  function toggleScreen(screen: AssignableScreen) {
+    const showing = screen.playlist_id === playlist.id;
+    void run(async () => {
+      const client = supabase();
+      const { error } = await client
+        .from("screens")
+        .update({ playlist_id: showing ? null : playlist.id })
+        .eq("id", screen.id);
+      if (error) return { error };
+      return client
+        .from("screen_commands")
+        .insert({ org_id: orgId, screen_id: screen.id, command: "resync" });
+    }, showing ? "أُوقف عرض القائمة على الشاشة" : "أُرسلت القائمة إلى الشاشة");
   }
 
   async function publish() {
@@ -172,6 +189,31 @@ export function PlaylistEditor({
         </label>
         <button className="button-quiet-blue" disabled={busy}>إضافة النص</button>
       </form>
+
+      <section className="assign-section">
+        <h2>اعرض هذه القائمة على</h2>
+        {screens.length === 0 ? (
+          <p className="page-note">لا توجد شاشات مربوطة بعد.</p>
+        ) : (
+          <ul className="assign-list">
+            {screens.map((screen) => {
+              const showing = screen.playlist_id === playlist.id;
+              return (
+                <li key={screen.id}>
+                  <span>{screen.name ?? "شاشة بلا اسم"}</span>
+                  <button
+                    className={showing ? "button-quiet-blue" : "button-scan"}
+                    disabled={busy}
+                    onClick={() => toggleScreen(screen)}
+                  >
+                    {showing ? "إيقاف" : "عرض"}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
       {status && <p className="page-note" role="status">{status}</p>}
       <button className="button-primary" disabled={busy} onClick={publish}>تحديث الشاشات الآن</button>

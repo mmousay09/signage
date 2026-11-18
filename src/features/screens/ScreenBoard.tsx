@@ -25,6 +25,9 @@ function ScreenLine({ screen, now }: { screen: ScreenRow; now: number | null }) 
           {stateText}
           {!online && !disabled && lastSeenText(screen, now) ? `، ${lastSeenText(screen, now)}` : ""}
         </span>
+        {!disabled && !screen.playlist_id && (
+          <span className="screen-warning">لم تُحدد قائمة عرض لهذه الشاشة</span>
+        )}
         {online && screen.player_state?.audio === "blocked" && (
           <span className="screen-warning">الصوت يحتاج لمسة على الشاشة</span>
         )}
