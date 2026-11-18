@@ -2,6 +2,7 @@
 
 import { createClient as createAuthClient } from "@supabase/supabase-js";
 import { useEffect, useState, type FormEvent } from "react";
+import { safeNextPath } from "@/lib/screen-links";
 import { supabaseKey, supabaseUrl } from "@/lib/supabase/config";
 
 export default function LoginPage() {
@@ -10,7 +11,10 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).has("link_error")) {
+    const params = new URLSearchParams(window.location.search);
+    const next = safeNextPath(params.get("next"));
+    if (next) window.localStorage.setItem("signage-next", next);
+    if (params.has("link_error")) {
       setError("انتهت صلاحية رابط الدخول. اطلب رابطًا جديدًا.");
     }
   }, []);

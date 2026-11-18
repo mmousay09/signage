@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { safeNextPath } from "@/lib/screen-links";
 import { createClient } from "@/lib/supabase/browser";
 
 // رابط البريد يحمل الجلسة بعد علامة #، فيعمل حتى لو فُتح في متصفح آخر على الهاتف
@@ -19,7 +20,9 @@ export default function AuthCallbackPage() {
     void createClient()
       .auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
       .then(({ error }) => {
-        window.location.replace(error ? "/login?link_error=1" : "/dashboard");
+        const next = safeNextPath(window.localStorage.getItem("signage-next"));
+        window.localStorage.removeItem("signage-next");
+        window.location.replace(error ? "/login?link_error=1" : (next ?? "/dashboard"));
       });
   }, []);
 

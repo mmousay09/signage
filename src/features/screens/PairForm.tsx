@@ -1,17 +1,46 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/browser";
+import { parseScreenLink } from "@/lib/screen-links";
+import { QrScanner } from "./QrScanner";
 
-export function PairForm({ orgId }: { orgId: string }) {
+export function PairForm({
+  orgId,
+  initialCode,
+  startScanning,
+}: {
+  orgId: string;
+  initialCode: string;
+  startScanning: boolean;
+}) {
   const router = useRouter();
-  const [code, setCode] = useState("");
+  const nameRef = useRef<HTMLInputElement>(null);
+  const [code, setCode] = useState(initialCode);
+  const [scanning, setScanning] = useState(startScanning);
   const [playerUrl, setPlayerUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => setPlayerUrl(`${window.location.origin}/play`), []);
+  useEffect(() => {
+    if (initialCode) nameRef.current?.focus();
+  }, [initialCode]);
+
+  function handleScan(text: string) {
+    setScanning(false);
+    const link = parseScreenLink(text, window.location.origin);
+    if (link?.type === "screen") {
+      router.push(`/screens/${link.id}`);
+    } else if (link?.type === "pair") {
+      setCode(link.code);
+      setError(null);
+      setTimeout(() => nameRef.current?.focus(), 0);
+    } else {
+      setError("هذا الرمز لا يخص شاشات هذه المنظومة.");
+    }
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -27,7 +56,7 @@ export function PairForm({ orgId }: { orgId: string }) {
     if (rpcError) {
       setError(
         rpcError.message.includes("invalid_or_expired_code")
-          ? "الرمز غير صحيح أو انتهت صلاحيته. أدخل الرمز الظاهر الآن على الشاشة."
+          ? "الرمز غير صحيح أو انتهت صلاحيته. امسح الرمز الظاهر الآن على الشاشة."
           : "تعذر ربط الشاشة. تأكد من الاتصال وحاول مرة أخرى.",
       );
       setBusy(false);
@@ -43,6 +72,9 @@ export function PairForm({ orgId }: { orgId: string }) {
       <p className="page-note">
         افتح هذا الرابط على الشاشة: <bdi dir="ltr">{playerUrl}</bdi>
       </p>
+      <button className="button-scan" type="button" onClick={() => setScanning(true)}>
+        مسح QR بالكاميرا
+      </button>
       <form className="form" onSubmit={submit}>
         <label>
           الرمز الظاهر على الشاشة
@@ -54,14 +86,13 @@ export function PairForm({ orgId }: { orgId: string }) {
             pattern="[0-9]{5}"
             maxLength={5}
             required
-            autoFocus
             value={code}
             onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))}
           />
         </label>
         <label>
           اسم الشاشة
-          <input name="name" required maxLength={80} placeholder="مدخل القاعة" />
+          <input ref={nameRef} name="name" required maxLength={80} placeholder="مدخل القاعة" />
         </label>
         <label>
           الموقع (اختياري)
@@ -72,6 +103,7 @@ export function PairForm({ orgId }: { orgId: string }) {
           {busy ? "جارٍ الربط" : "ربط الشاشة"}
         </button>
       </form>
+      {scanning && <QrScanner onResult={handleScan} onClose={() => setScanning(false)} />}
     </main>
   );
 }

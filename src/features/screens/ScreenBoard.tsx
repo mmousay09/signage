@@ -109,6 +109,7 @@ export function ScreenBoard({ orgId, initialScreens }: { orgId: string; initialS
       )}
 
       <div className="thumb-bar">
+        <Link className="button-scan" href="/screens/new?scan=1">مسح QR</Link>
         <Link className="button-primary" href="/screens/new">ربط شاشة</Link>
       </div>
     </main>

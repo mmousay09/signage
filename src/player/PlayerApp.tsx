@@ -1,5 +1,7 @@
 "use client";
 
+import { QrCode } from "@/components/ui/QrCode";
+import { pairingUrl, screenUrl } from "@/lib/screen-links";
 import { unlockAudio } from "@/player/audio/audio";
 import { useScreenConnection } from "@/player/sync/useScreenConnection";
 
@@ -40,7 +42,14 @@ export function PlayerApp() {
               </span>
             ))}
           </div>
-          <p>من هاتفك، افتح لوحة الشاشات واضغط «ربط شاشة»، ثم أدخل هذا الرمز.</p>
+          {screen.code && (
+            <QrCode
+              className="player-qr"
+              value={pairingUrl(window.location.origin, screen.code)}
+              label="رمز QR لربط هذه الشاشة"
+            />
+          )}
+          <p>امسح رمز QR بهاتفك، أو أدخل الأرقام في لوحة الشاشات.</p>
           <small>يتجدد الرمز تلقائيًا قبل انتهاء صلاحيته.</small>
         </section>
       )}
@@ -50,6 +59,13 @@ export function PlayerApp() {
           <h1>{screen.screenName ?? "شاشة بلا اسم"}</h1>
           {screen.location && <p>{screen.location}</p>}
           <small>جاهزة، بانتظار المحتوى</small>
+          {screen.screenId && (
+            <QrCode
+              className="player-qr player-qr-small"
+              value={screenUrl(window.location.origin, screen.screenId)}
+              label="رمز QR لفتح هذه الشاشة في لوحة التحكم"
+            />
+          )}
         </section>
       )}
 
@@ -72,6 +88,13 @@ export function PlayerApp() {
         <section className="identify" aria-live="assertive">
           <small>هذه هي الشاشة</small>
           <h1>{screen.screenName ?? "شاشة بلا اسم"}</h1>
+          {screen.screenId && (
+            <QrCode
+              className="player-qr"
+              value={screenUrl(window.location.origin, screen.screenId)}
+              label="رمز QR لفتح هذه الشاشة في لوحة التحكم"
+            />
+          )}
         </section>
       )}
     </main>

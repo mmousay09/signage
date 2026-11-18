@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { safeNextPath } from "@/lib/screen-links";
 import { supabaseKey, supabaseUrl } from "@/lib/supabase/config";
 
 export async function proxy(request: NextRequest) {
@@ -25,18 +26,24 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
   const signedIn = Boolean(user && !user.is_anonymous);
 
-  const redirectTo = (path: string) => {
+  const redirectTo = (target: string) => {
     const url = request.nextUrl.clone();
+    const [path, search = ""] = target.split("?");
     url.pathname = path;
-    url.search = "";
+    url.search = search;
     const redirect = NextResponse.redirect(url);
     response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
     return redirect;
   };
 
   if (pathname.startsWith("/auth/")) return response;
-  if (!signedIn && pathname !== "/login") return redirectTo("/login");
-  if (signedIn && pathname === "/login") return redirectTo("/dashboard");
+  if (!signedIn && pathname !== "/login") {
+    const next = encodeURIComponent(`${pathname}${request.nextUrl.search}`);
+    return redirectTo(`/login?next=${next}`);
+  }
+  if (signedIn && pathname === "/login") {
+    return redirectTo(safeNextPath(request.nextUrl.searchParams.get("next")) ?? "/dashboard");
+  }
   return response;
 }
 

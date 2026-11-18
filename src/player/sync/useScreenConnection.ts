@@ -17,6 +17,7 @@ export type PlayerPhase = "starting" | "pairing" | "ready" | "disabled" | "setup
 export interface ScreenConnection {
   phase: PlayerPhase;
   code: string | null;
+  screenId: string | null;
   screenName: string | null;
   location: string | null;
   isConnected: boolean;
@@ -34,6 +35,7 @@ interface PairingResult {
 export function useScreenConnection(): ScreenConnection {
   const [phase, setPhase] = useState<PlayerPhase>("starting");
   const [code, setCode] = useState<string | null>(null);
+  const [screenId, setScreenId] = useState<string | null>(null);
   const [screenName, setScreenName] = useState<string | null>(null);
   const [location, setLocation] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(true);
@@ -187,6 +189,7 @@ export function useScreenConnection(): ScreenConnection {
         .select("name, location")
         .eq("id", result.screen_id)
         .maybeSingle();
+      setScreenId(result.screen_id);
       setScreenName((screen?.name as string | null) ?? null);
       setLocation((screen?.location as string | null) ?? null);
       setCode(null);
@@ -237,5 +240,5 @@ export function useScreenConnection(): ScreenConnection {
     };
   }, []);
 
-  return { phase, code, screenName, location, isConnected, isIdentifying, audio, setAudio };
+  return { phase, code, screenId, screenName, location, isConnected, isIdentifying, audio, setAudio };
 }
