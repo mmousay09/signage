@@ -9,7 +9,12 @@ export interface ScreenRow {
   is_online: boolean;
   contract_title: string | null;
   client_name: string | null;
+  playlist_id: string | null;
+  layout_id: string | null;
+  cached_bytes: number | null;
+  free_bytes: number | null;
   player_state: {
+    content?: { status?: string; ready?: number; total?: number; error?: string };
     audio?: "ready" | "blocked" | "unknown";
     wake_lock?: boolean;
     display?: string;
@@ -17,7 +22,7 @@ export interface ScreenRow {
   } | null;
 }
 
-export type ScreenCommand = "reload" | "identify";
+export type ScreenCommand = "reload" | "identify" | "resync";
 
 const ONLINE_WINDOW_MS = 90_000;
 

@@ -5,8 +5,15 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabaseKey, supabaseUrl } from "@/lib/supabase/config";
 import { getPlayerClient } from "@/lib/supabase/player";
 import { getAudioState, playChime, type AudioState } from "@/player/audio/audio";
+import {
+  clearStoredContent,
+  getStorageStats,
+  installManifest,
+  loadActiveManifest,
+  type PlayerManifest,
+} from "@/player/offline/store";
 
-const APP_VERSION = "0.1.0";
+const APP_VERSION = "0.2.0";
 const PAIRING_INTERVAL = 3_000;
 const HEARTBEAT_INTERVAL = 30_000;
 const RETRY_INTERVAL = 5_000;
@@ -24,6 +31,7 @@ export interface ScreenConnection {
   isIdentifying: boolean;
   audio: AudioState;
   setAudio: (state: AudioState) => void;
+  manifest: PlayerManifest | null;
 }
 
 interface PairingResult {
@@ -41,6 +49,7 @@ export function useScreenConnection(): ScreenConnection {
   const [isConnected, setIsConnected] = useState(true);
   const [isIdentifying, setIsIdentifying] = useState(false);
   const [audio, setAudio] = useState<AudioState>("unknown");
+  const [manifest, setManifest] = useState<PlayerManifest | null>(null);
 
   useEffect(() => {
     if (!supabaseUrl || !supabaseKey) {
@@ -58,6 +67,46 @@ export function useScreenConnection(): ScreenConnection {
     let processing = false;
     let processAgain = false;
     let wakeLock: WakeLockSentinel | null = null;
+    let activeVersion: string | null = null;
+    let syncing = false;
+    let contentState: Record<string, unknown> = { status: "idle" };
+
+    void loadActiveManifest()
+      .then((stored) => {
+        if (!stored || stopped || activeVersion) return;
+        activeVersion = stored.version;
+        setManifest(stored);
+      })
+      .catch(() => undefined);
+
+    const syncContent = async () => {
+      if (syncing) return;
+      syncing = true;
+      try {
+        const { data, error } = await supabase.rpc("get_player_manifest");
+        if (error) throw error;
+        const remote = data as PlayerManifest | { version: null };
+        if (!remote.version || remote.version === activeVersion) {
+          contentState = { status: "ready", version: activeVersion };
+          return;
+        }
+        const next = remote as PlayerManifest;
+        await installManifest(supabase, next, (ready, total) => {
+          contentState = { status: "downloading", version: next.version, ready, total };
+        });
+        activeVersion = next.version;
+        contentState = { status: "ready", version: next.version };
+        if (!stopped) setManifest(next);
+      } catch (error) {
+        contentState = {
+          status: "error",
+          version: activeVersion,
+          error: error instanceof Error ? error.message.slice(0, 120) : "sync_failed",
+        };
+      } finally {
+        syncing = false;
+      }
+    };
 
     const requestWakeLock = async () => {
       try {
@@ -102,9 +151,12 @@ export function useScreenConnection(): ScreenConnection {
             try {
               if (item.command === "reload") shouldReload = true;
               if (item.command === "identify") await identify();
-              if (item.command === "clear_cache" && "caches" in window) {
-                const keys = await caches.keys();
-                await Promise.all(keys.map((key) => caches.delete(key)));
+              if (item.command === "resync") void syncContent();
+              if (item.command === "clear_cache") {
+                await clearStoredContent();
+                activeVersion = null;
+                setManifest(null);
+                void syncContent();
               }
             } catch {
               ok = false;
@@ -137,7 +189,9 @@ export function useScreenConnection(): ScreenConnection {
     };
 
     const ensureSession = async () => {
-      const { data } = await supabase.auth.getSession();
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      // انقطاع الإنترنت يجب ألا يصنع هوية جديدة للشاشة
+      if (sessionError) throw sessionError;
       if (data.session) return true;
       const { error } = await supabase.auth.signInAnonymously();
       if (!error) return true;
@@ -166,9 +220,13 @@ export function useScreenConnection(): ScreenConnection {
 
       const currentAudio = getAudioState();
       setAudio(currentAudio);
+      const storage = await getStorageStats();
       const heartbeat = await supabase.rpc("screen_heartbeat", {
         p_app_version: APP_VERSION,
+        p_cached_bytes: storage.used,
+        p_free_bytes: storage.free,
         p_state: {
+          content: contentState,
           audio: currentAudio,
           wake_lock: Boolean(wakeLock),
           display: `${window.screen.width}x${window.screen.height}`,
@@ -197,6 +255,7 @@ export function useScreenConnection(): ScreenConnection {
       void requestWakeLock();
       await connectChannel(result.screen_id);
       await processCommands();
+      void syncContent();
       return HEARTBEAT_INTERVAL;
     };
 
@@ -240,5 +299,5 @@ export function useScreenConnection(): ScreenConnection {
     };
   }, []);
 
-  return { phase, code, screenId, screenName, location, isConnected, isIdentifying, audio, setAudio };
+  return { phase, code, screenId, screenName, location, isConnected, isIdentifying, audio, setAudio, manifest };
 }

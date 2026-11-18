@@ -11,6 +11,11 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         <Link href="/dashboard">{org.name}</Link>
         <SignOutButton />
       </header>
+      <nav className="admin-nav" aria-label="أقسام لوحة التحكم">
+        <Link href="/dashboard">الشاشات</Link>
+        <Link href="/playlists">قوائم العرض</Link>
+        <Link href="/media">الوسائط</Link>
+      </nav>
       {children}
     </div>
   );

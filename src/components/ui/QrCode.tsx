@@ -9,16 +9,18 @@ export function QrCode({ value, label, className }: { value: string; label: stri
 
   useEffect(() => {
     let active = true;
-    void import("qrcode").then(({ create }) => {
-      const { size, data } = create(value, { errorCorrectionLevel: "M" }).modules;
-      let path = "";
-      for (let y = 0; y < size; y += 1) {
-        for (let x = 0; x < size; x += 1) {
-          if (data[y * size + x]) path += `M${x} ${y}h1v1h-1z`;
+    void import("qrcode")
+      .then(({ create }) => {
+        const { size, data } = create(value, { errorCorrectionLevel: "M" }).modules;
+        let path = "";
+        for (let y = 0; y < size; y += 1) {
+          for (let x = 0; x < size; x += 1) {
+            if (data[y * size + x]) path += `M${x} ${y}h1v1h-1z`;
+          }
         }
-      }
-      if (active) setMatrix({ size, path });
-    });
+        if (active) setMatrix({ size, path });
+      })
+      .catch(() => undefined); // قد لا تتوفر المكتبة دون إنترنت، وتبقى الأرقام والمحتوى
     return () => {
       active = false;
     };

@@ -2,11 +2,21 @@
 
 import { QrCode } from "@/components/ui/QrCode";
 import { pairingUrl, screenUrl } from "@/lib/screen-links";
+import { useEffect } from "react";
 import { unlockAudio } from "@/player/audio/audio";
+import { registerPlayerWorker } from "@/player/offline/store";
 import { useScreenConnection } from "@/player/sync/useScreenConnection";
+import { ContentStage } from "@/player/zones/ContentStage";
 
 export function PlayerApp() {
   const screen = useScreenConnection();
+  const hasContent =
+    Boolean(screen.manifest?.program.items.length) &&
+    (screen.phase === "starting" || screen.phase === "ready");
+
+  useEffect(() => {
+    void registerPlayerWorker();
+  }, []);
 
   const handleTouch = async () => {
     screen.setAudio(await unlockAudio());
@@ -19,7 +29,9 @@ export function PlayerApp() {
     <main className="player" data-phase={screen.phase} onPointerDown={handleTouch}>
       <audio id="player-chime" src="/sounds/chime.wav" preload="auto" />
 
-      {screen.phase === "starting" && <p className="player-note">جارٍ تشغيل الشاشة</p>}
+      {hasContent && screen.manifest && <ContentStage manifest={screen.manifest} />}
+
+      {screen.phase === "starting" && !hasContent && <p className="player-note">جارٍ تشغيل الشاشة</p>}
 
       {screen.phase === "setup-error" && (
         <section className="player-message">
@@ -54,7 +66,7 @@ export function PlayerApp() {
         </section>
       )}
 
-      {screen.phase === "ready" && (
+      {screen.phase === "ready" && !hasContent && (
         <section className="standby">
           <h1>{screen.screenName ?? "شاشة بلا اسم"}</h1>
           {screen.location && <p>{screen.location}</p>}
@@ -76,11 +88,11 @@ export function PlayerApp() {
         </section>
       )}
 
-      {!screen.isConnected && screen.phase !== "setup-error" && (
+      {!hasContent && !screen.isConnected && screen.phase !== "setup-error" && (
         <p className="player-strip">لا يوجد اتصال بالإنترنت. ستعاد المحاولة تلقائيًا.</p>
       )}
 
-      {screen.isConnected && screen.phase === "ready" && screen.audio === "blocked" && (
+      {!hasContent && screen.isConnected && screen.phase === "ready" && screen.audio === "blocked" && (
         <p className="player-strip">المس الشاشة مرة واحدة لتفعيل الصوت</p>
       )}
 
