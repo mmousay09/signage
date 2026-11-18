@@ -27,7 +27,13 @@ self.addEventListener("message", (event) => {
   if (event.data?.type !== "cache-urls" || !Array.isArray(event.data.urls)) return;
   const urls = event.data.urls.filter((url) => new URL(url).origin === self.location.origin);
   event.waitUntil(
-    caches.open(SHELL_CACHE).then((cache) => Promise.allSettled(urls.map((url) => cache.add(url)))),
+    caches.open(SHELL_CACHE).then((cache) =>
+      Promise.allSettled(
+        urls.map(async (url) => {
+          if (!(await cache.match(url, { ignoreSearch: true }))) await cache.add(url);
+        }),
+      ),
+    ),
   );
 });
 

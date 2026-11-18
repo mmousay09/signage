@@ -100,15 +100,27 @@ export async function registerPlayerWorker() {
   if (!("serviceWorker" in navigator)) return;
   try {
     void navigator.storage?.persist?.();
-    const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/play" });
-    const worker = registration.active ?? registration.waiting ?? registration.installing;
-    const urls = performance
-      .getEntriesByType("resource")
-      .map((entry) => entry.name)
-      .filter((url) => new URL(url).pathname.startsWith("/_next/static/"));
-    const send = () => worker?.postMessage({ type: "cache-urls", urls });
-    if (worker?.state === "activated") send();
-    else worker?.addEventListener("statechange", () => worker.state === "activated" && send());
+    await navigator.serviceWorker.register("/sw.js", { scope: "/play" });
+    const registration = await navigator.serviceWorker.ready;
+    const send = () => {
+      const urls = new Set<string>();
+      performance.getEntriesByType("resource").forEach((entry) => urls.add(entry.name));
+      document.querySelectorAll<HTMLScriptElement>("script[src]").forEach((script) => urls.add(script.src));
+      document
+        .querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"], link[rel="preload"], link[rel="modulepreload"]')
+        .forEach((link) => urls.add(link.href));
+      registration.active?.postMessage({
+        type: "cache-urls",
+        urls: [...urls].filter((url) => {
+          const parsed = new URL(url);
+          return parsed.origin === window.location.origin && parsed.pathname.startsWith("/_next/static/");
+        }),
+      });
+    };
+    // تُعاد المحاولة لأن بعض ملفات الصفحة تكتمل بعد تسجيل العامل
+    send();
+    window.setTimeout(send, 3_000);
+    window.setTimeout(send, 20_000);
   } catch {
     // العرض يستمر حتى لو تعذر تسجيل التخزين
   }
