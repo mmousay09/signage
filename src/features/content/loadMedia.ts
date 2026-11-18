@@ -18,7 +18,7 @@ export async function loadMedia(supabase: ServerClient, orgId: string): Promise<
     .from("media")
     .createSignedUrls(assets.map((asset) => asset.storage_path), 3600);
   const urls = new Map<string, string>();
-  (signed ?? []).forEach((item: { path: string | null; signedUrl: string }) => {
+  (signed ?? []).forEach((item) => {
     if (item.path && item.signedUrl) urls.set(item.path, item.signedUrl);
   });
   return assets.map((asset) => ({ ...asset, url: urls.get(asset.storage_path) ?? null }));
