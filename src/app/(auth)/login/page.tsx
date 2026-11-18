@@ -1,75 +1,47 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { createClient } from "@/lib/supabase/browser";
+import { createClient as createAuthClient } from "@supabase/supabase-js";
+import { useEffect, useState, type FormEvent } from "react";
+import { supabaseKey, supabaseUrl } from "@/lib/supabase/config";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [codeSent, setCodeSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sentTo, setSentTo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function sendCode(event: FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has("link_error")) {
+      setError("انتهت صلاحية رابط الدخول. اطلب رابطًا جديدًا.");
+    }
+  }, []);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
     setError(null);
-    const { error: sendError } = await createClient().auth.signInWithOtp({ email: email.trim() });
+    const email = String(new FormData(event.currentTarget).get("email")).trim();
+    const auth = createAuthClient(supabaseUrl, supabaseKey, {
+      auth: { flowType: "implicit", persistSession: false, autoRefreshToken: false },
+    }).auth;
+    const { error: sendError } = await auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+    });
     setBusy(false);
     if (sendError) {
-      setError("تعذر إرسال الرمز. انتظر قليلًا ثم حاول مرة أخرى.");
+      setError("تعذر إرسال رابط الدخول. انتظر قليلًا ثم حاول مرة أخرى.");
       return;
     }
-    setCodeSent(true);
+    setSentTo(email);
   }
 
-  async function verifyCode(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setBusy(true);
-    setError(null);
-    const token = String(new FormData(event.currentTarget).get("code")).replace(/\D/g, "");
-    const { error: verifyError } = await createClient().auth.verifyOtp({
-      email: email.trim(),
-      token,
-      type: "email",
-    });
-    if (verifyError) {
-      setError("الرمز غير صحيح أو انتهت صلاحيته.");
-      setBusy(false);
-      return;
-    }
-    window.location.assign("/dashboard");
-  }
-
-  if (codeSent) {
+  if (sentTo) {
     return (
       <main className="auth">
-        <h1>أدخل رمز الدخول</h1>
+        <h1>افتح بريدك</h1>
         <p className="page-note">
-          أرسلنا الرمز إلى <bdi dir="ltr">{email.trim()}</bdi>. إن لم تجده، راجع مجلد الرسائل غير المرغوبة.
+          أرسلنا رابط الدخول إلى <bdi dir="ltr">{sentTo}</bdi>. إن لم تجده، راجع مجلد الرسائل غير المرغوبة.
         </p>
-        <form className="form" onSubmit={verifyCode}>
-          <label>
-            الرمز
-            <input
-              className="code-input"
-              name="code"
-              dir="ltr"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              pattern="[0-9]{6,8}"
-              maxLength={8}
-              required
-              autoFocus
-            />
-          </label>
-          {error && <p className="form-error" role="alert">{error}</p>}
-          <button className="button-primary" disabled={busy}>
-            {busy ? "جارٍ الدخول" : "دخول"}
-          </button>
-        </form>
-        <button className="button-quiet" onClick={() => setCodeSent(false)}>
-          تغيير البريد
-        </button>
       </main>
     );
   }
@@ -77,22 +49,14 @@ export default function LoginPage() {
   return (
     <main className="auth">
       <h1>لوحة الشاشات</h1>
-      <form className="form" onSubmit={sendCode}>
+      <form className="form" onSubmit={submit}>
         <label>
           البريد الإلكتروني
-          <input
-            name="email"
-            type="email"
-            dir="ltr"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
+          <input name="email" type="email" dir="ltr" autoComplete="email" required />
         </label>
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="button-primary" disabled={busy}>
-          {busy ? "جارٍ الإرسال" : "أرسل رمز الدخول"}
+          {busy ? "جارٍ الإرسال" : "أرسل رابط الدخول"}
         </button>
       </form>
     </main>
