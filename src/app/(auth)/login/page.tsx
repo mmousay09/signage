@@ -1,30 +1,45 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/browser";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [sentTo, setSentTo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has("link_error")) {
+      setError("انتهت صلاحية رابط الدخول. اطلب رابطًا جديدًا وافتحه في المتصفح نفسه.");
+    }
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
     setError(null);
-    const form = new FormData(event.currentTarget);
-    const { error: signInError } = await createClient().auth.signInWithPassword({
-      email: String(form.get("email")),
-      password: String(form.get("password")),
+    const email = String(new FormData(event.currentTarget).get("email")).trim();
+    const { error: sendError } = await createClient().auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
     });
-    if (signInError) {
-      setError("البريد أو كلمة المرور غير صحيحة.");
-      setBusy(false);
+    setBusy(false);
+    if (sendError) {
+      setError("تعذر إرسال رابط الدخول. انتظر قليلًا ثم حاول مرة أخرى.");
       return;
     }
-    router.replace("/dashboard");
-    router.refresh();
+    setSentTo(email);
+  }
+
+  if (sentTo) {
+    return (
+      <main className="auth">
+        <h1>افتح بريدك</h1>
+        <p className="page-note">
+          أرسلنا رابط الدخول إلى <bdi dir="ltr">{sentTo}</bdi>. افتحه في هذا المتصفح نفسه.
+        </p>
+      </main>
+    );
   }
 
   return (
@@ -35,13 +50,9 @@ export default function LoginPage() {
           البريد الإلكتروني
           <input name="email" type="email" dir="ltr" autoComplete="email" required />
         </label>
-        <label>
-          كلمة المرور
-          <input name="password" type="password" dir="ltr" autoComplete="current-password" required />
-        </label>
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="button-primary" disabled={busy}>
-          {busy ? "جارٍ الدخول" : "دخول"}
+          {busy ? "جارٍ الإرسال" : "أرسل رابط الدخول"}
         </button>
       </form>
     </main>

@@ -5,15 +5,15 @@
 ## إعداد Supabase
 
 1. في **Authentication** فعّل **Anonymous Sign-Ins**.
-2. في **SQL Editor** شغّل `supabase/migrations/0001_schema.sql` إن لم تكن شغّلته، ثم `0002_phase1.sql`.
+2. في **SQL Editor** شغّل ملفات `supabase/migrations` بالترتيب.
 3. في **Realtime > Settings** عطّل **Allow public access**.
-4. في **Authentication > Users** اختر **Add user**، وأنشئ حسابك ببريد وكلمة مرور مع تأكيد البريد تلقائيًا.
+4. في **Authentication > URL Configuration** اجعل Site URL رابط الموقع، وأضف `https://موقعك/auth/callback` إلى Redirect URLs.
 
-## النشر على Vercel
+## النشر
 
-1. استورد المستودع من GitHub.
-2. أضف المتغيرين الموجودين في `.env.example`، وقيمهما من Supabase > Project Settings > API.
-3. انشر المشروع، ثم افتح `/login` من هاتفك وأدخل اسم الشركة.
+1. استورد المستودع من GitHub في منصة تدعم Next.js.
+2. أضف المتغيرين الموجودين في `.env.example`، وقيمهما من Supabase > Project Settings > API Keys.
+3. انشر المشروع، ثم افتح `/login` واطلب رابط الدخول إلى بريدك. أول حساب يدخل ينشئ الشركة.
 
 ## تجهيز شاشة أندرويد
 

@@ -34,6 +34,7 @@ export async function proxy(request: NextRequest) {
     return redirect;
   };
 
+  if (pathname.startsWith("/auth/")) return response;
   if (!signedIn && pathname !== "/login") return redirectTo("/login");
   if (signedIn && pathname === "/login") return redirectTo("/dashboard");
   return response;

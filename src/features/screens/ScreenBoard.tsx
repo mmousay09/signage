@@ -64,7 +64,7 @@ export function ScreenBoard({ orgId, initialScreens }: { orgId: string; initialS
     };
 
     const channel = supabase
-      .channel(`dashboard:${orgId}`)
+      .channel(`dashboard:${orgId}`, { config: { private: true } })
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "screens", filter: `org_id=eq.${orgId}` },
