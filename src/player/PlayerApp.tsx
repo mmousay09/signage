@@ -1,0 +1,79 @@
+"use client";
+
+import { unlockAudio } from "@/player/audio/audio";
+import { useScreenConnection } from "@/player/sync/useScreenConnection";
+
+export function PlayerApp() {
+  const screen = useScreenConnection();
+
+  const handleTouch = async () => {
+    screen.setAudio(await unlockAudio());
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen?.().catch(() => undefined);
+    }
+  };
+
+  return (
+    <main className="player" data-phase={screen.phase} onPointerDown={handleTouch}>
+      <audio id="player-chime" src="/sounds/chime.wav" preload="auto" />
+
+      {screen.phase === "starting" && <p className="player-note">جارٍ تشغيل الشاشة</p>}
+
+      {screen.phase === "setup-error" && (
+        <section className="player-message">
+          <h1>إعداد الخادم غير مكتمل</h1>
+          <p>تأكد من مفاتيح Supabase ومن تفعيل Anonymous Sign-Ins.</p>
+        </section>
+      )}
+
+      {screen.phase === "pairing" && (
+        <section className="pairing">
+          <h1>اربط هذه الشاشة</h1>
+          <div className="flap-row" dir="ltr" role="img" aria-label={`رمز الربط ${screen.code ?? ""}`}>
+            {(screen.code ?? "     ").split("").map((digit, index) => (
+              <span
+                className="flap"
+                key={`${screen.code}-${index}`}
+                style={{ animationDelay: `${index * 70}ms` }}
+              >
+                {digit}
+              </span>
+            ))}
+          </div>
+          <p>من هاتفك، افتح لوحة الشاشات واضغط «ربط شاشة»، ثم أدخل هذا الرمز.</p>
+          <small>يتجدد الرمز تلقائيًا قبل انتهاء صلاحيته.</small>
+        </section>
+      )}
+
+      {screen.phase === "ready" && (
+        <section className="standby">
+          <h1>{screen.screenName ?? "شاشة بلا اسم"}</h1>
+          {screen.location && <p>{screen.location}</p>}
+          <small>جاهزة، بانتظار المحتوى</small>
+        </section>
+      )}
+
+      {screen.phase === "disabled" && (
+        <section className="player-message">
+          <h1>هذه الشاشة موقوفة</h1>
+          <p>يمكن تشغيلها من لوحة الشاشات.</p>
+        </section>
+      )}
+
+      {!screen.isConnected && screen.phase !== "setup-error" && (
+        <p className="player-strip">لا يوجد اتصال بالإنترنت. ستعاد المحاولة تلقائيًا.</p>
+      )}
+
+      {screen.isConnected && screen.phase === "ready" && screen.audio === "blocked" && (
+        <p className="player-strip">المس الشاشة مرة واحدة لتفعيل الصوت</p>
+      )}
+
+      {screen.isIdentifying && (
+        <section className="identify" aria-live="assertive">
+          <small>هذه هي الشاشة</small>
+          <h1>{screen.screenName ?? "شاشة بلا اسم"}</h1>
+        </section>
+      )}
+    </main>
+  );
+}
