@@ -29,6 +29,19 @@ export interface ManifestContract {
   program: ManifestProgram;
 }
 
+export interface ManifestSchedule {
+  id: string;
+  recurrence: "once" | "daily" | "weekly";
+  run_on: string | null;
+  local_time: string;
+  weekdays: number[] | null;
+  timezone: string;
+  starts_at: string | null;
+  ends_at: string | null;
+  title: string;
+  body: string;
+}
+
 export interface PlayerManifest {
   version: string;
   organization: string;
@@ -36,6 +49,7 @@ export interface PlayerManifest {
   fallback_headline?: string;
   idle?: ManifestProgram | null;
   contracts?: ManifestContract[];
+  schedules?: ManifestSchedule[];
   program: ManifestProgram;
 }
 

@@ -19,6 +19,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         <Link href="/contracts">العقود</Link>
         <Link href="/playlists">القوائم</Link>
         <Link href="/media">الوسائط</Link>
+        <Link href="/announcements">الإعلانات</Link>
       </nav>
       {children}
     </div>

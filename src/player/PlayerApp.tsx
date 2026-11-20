@@ -3,6 +3,7 @@
 import { QrCode } from "@/components/ui/QrCode";
 import { pairingUrl, screenUrl } from "@/lib/screen-links";
 import { useEffect, useState } from "react";
+import { AnnouncementLayer } from "@/player/announce/AnnouncementLayer";
 import { unlockAudio } from "@/player/audio/audio";
 import { resolveContent } from "@/player/engine/schedule";
 import { registerPlayerWorker } from "@/player/offline/store";
@@ -133,6 +134,10 @@ export function PlayerApp() {
       {!hasContent && screen.isConnected && screen.phase === "ready" && screen.audio === "blocked" && (
         <p className="player-strip">المس الشاشة مرة واحدة لتفعيل الصوت</p>
       )}
+
+      {screen.phase === "ready" || (screen.phase === "starting" && screen.manifest) ? (
+        <AnnouncementLayer schedules={screen.manifest?.schedules} clockOffset={screen.clockOffset} />
+      ) : null}
 
       {screen.isIdentifying && (
         <section className="identify" aria-live="assertive">

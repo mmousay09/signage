@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabaseKey, supabaseUrl } from "@/lib/supabase/config";
 import { getPlayerClient } from "@/lib/supabase/player";
+import { emitAnnouncement } from "@/player/announce/engine";
 import { getAudioState, playChime, type AudioState } from "@/player/audio/audio";
 import {
   clearStoredContent,
@@ -13,7 +14,7 @@ import {
   type PlayerManifest,
 } from "@/player/offline/store";
 
-const APP_VERSION = "0.3.0";
+const APP_VERSION = "0.4.0";
 const CLOCK_KEY = "signage-clock-offset";
 const PAIRING_INTERVAL = 3_000;
 const HEARTBEAT_INTERVAL = 30_000;
@@ -182,6 +183,36 @@ export function useScreenConnection(): ScreenConnection {
       if (shouldReload && !stopped) window.location.reload();
     };
 
+    interface BroadcastMessage {
+      id: string;
+      body: string;
+      play_at: string;
+    }
+
+    // النداء العاجل: يُبلَّغ الخادم بوصوله، ثم يُعرض في اللحظة الموحدة
+    const receiveBroadcast = (message: BroadcastMessage) => {
+      if (!message?.id || !message.play_at) return;
+      void supabase.rpc("report_broadcast_status", { p_broadcast: message.id, p_status: "received" });
+      emitAnnouncement({
+        key: `broadcast:${message.id}`,
+        title: "نداء عاجل",
+        body: message.body,
+        at: Date.parse(message.play_at),
+        report: (status, driftMs, error) =>
+          void supabase.rpc("report_broadcast_status", {
+            p_broadcast: message.id,
+            p_status: status,
+            p_drift_ms: driftMs,
+            p_error: error ?? null,
+          }),
+      });
+    };
+
+    const fetchPendingBroadcasts = async () => {
+      const { data } = await supabase.rpc("pending_broadcasts");
+      for (const message of (data ?? []) as BroadcastMessage[]) receiveBroadcast(message);
+    };
+
     const connectChannel = async (screenId: string) => {
       if (channel && channelScreen === screenId && (channel.state as string) === "joined") return;
       if (channel) await supabase.removeChannel(channel);
@@ -190,8 +221,12 @@ export function useScreenConnection(): ScreenConnection {
       channel = supabase
         .channel(`screen:${screenId}`, { config: { private: true } })
         .on("broadcast", { event: "command" }, () => void processCommands())
+        .on("broadcast", { event: "broadcast" }, ({ payload }) => receiveBroadcast(payload as BroadcastMessage))
         .subscribe((status) => {
-          if (status === "SUBSCRIBED") void processCommands();
+          if (status === "SUBSCRIBED") {
+            void processCommands();
+            void fetchPendingBroadcasts();
+          }
         });
     };
 
