@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabaseKey, supabaseUrl } from "@/lib/supabase/config";
 import { getPlayerClient } from "@/lib/supabase/player";
-import { emitAnnouncement } from "@/player/announce/engine";
+import { emitAnnouncement, wasAnnounced } from "@/player/announce/engine";
 import { getAudioState, playChime, type AudioState } from "@/player/audio/audio";
 import {
   clearStoredContent,
@@ -191,20 +191,25 @@ export function useScreenConnection(): ScreenConnection {
 
     // النداء العاجل: يُبلَّغ الخادم بوصوله، ثم يُعرض في اللحظة الموحدة
     const receiveBroadcast = (message: BroadcastMessage) => {
-      if (!message?.id || !message.play_at) return;
-      void supabase.rpc("report_broadcast_status", { p_broadcast: message.id, p_status: "received" });
+      if (!message?.id || !message.play_at || wasAnnounced(`broadcast:${message.id}`)) return;
+      // طلبات Supabase لا تُرسل إلا عند انتظار نتيجتها
+      void supabase
+        .rpc("report_broadcast_status", { p_broadcast: message.id, p_status: "received" })
+        .then(() => undefined);
       emitAnnouncement({
         key: `broadcast:${message.id}`,
         title: "نداء عاجل",
         body: message.body,
         at: Date.parse(message.play_at),
         report: (status, driftMs, error) =>
-          void supabase.rpc("report_broadcast_status", {
-            p_broadcast: message.id,
-            p_status: status,
-            p_drift_ms: driftMs,
-            p_error: error ?? null,
-          }),
+          void supabase
+            .rpc("report_broadcast_status", {
+              p_broadcast: message.id,
+              p_status: status,
+              p_drift_ms: driftMs,
+              p_error: error ?? null,
+            })
+            .then(() => undefined),
       });
     };
 
@@ -304,6 +309,8 @@ export function useScreenConnection(): ScreenConnection {
       void requestWakeLock();
       await connectChannel(result.screen_id);
       await processCommands();
+      // احتياط إن ضاعت رسالة النداء أثناء انقطاع قصير
+      void fetchPendingBroadcasts();
       void syncContent();
       return HEARTBEAT_INTERVAL;
     };

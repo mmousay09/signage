@@ -19,6 +19,10 @@ const listeners = new Set<(item: Announcement) => void>();
 const seen = new Set<string>();
 const waiting: Announcement[] = [];
 
+export function wasAnnounced(key: string) {
+  return seen.has(key);
+}
+
 export function emitAnnouncement(item: Announcement) {
   if (seen.has(item.key)) return;
   seen.add(item.key);
