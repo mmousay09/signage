@@ -136,6 +136,109 @@
   .available small { font-size: 5vmin; font-weight: 600; }
   .available h1 { font-size: 12vmin; line-height: 1.25; font-weight: 700; }
   .available p { font-size: 6vmin; font-weight: 500; }
+  .kiosk {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 25%;
+    direction: ltr;
+    background: var(--color-route);
+  }
+  .kiosk-main { position: relative; overflow: hidden; background: #fff; }
+  .kiosk-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 2.4vmin;
+    min-width: 0;
+    padding: 3vmin 2vmin;
+    box-sizing: border-box;
+    background: var(--color-route);
+    color: #fff;
+    text-align: center;
+  }
+  .kiosk-brand { display: grid; place-items: center; min-height: 14vmin; }
+  .kiosk-brand img { max-width: 100%; max-height: 18vmin; object-fit: contain; }
+  .kiosk-brand strong { font-size: 3.4vmin; line-height: 1.3; font-weight: 700; overflow-wrap: anywhere; }
+  .kiosk-clock { display: grid; gap: 0.6vmin; }
+  .kiosk-clock time { color: var(--color-signal); font-size: 6vmin; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .kiosk-clock small { font-size: 2vmin; opacity: 0.85; }
+  .kiosk-languages {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 0.6vmin;
+    padding: 0.6vmin;
+    border-radius: 1.4vmin;
+    background: rgb(255 255 255 / 0.12);
+    direction: ltr;
+  }
+  .kiosk-languages button {
+    min-height: 6vmin;
+    border: 0;
+    border-radius: 1vmin;
+    background: transparent;
+    color: #fff;
+    font: inherit;
+    font-size: 2.6vmin;
+    font-weight: 700;
+  }
+  .kiosk-languages button[aria-pressed="true"] { background: #fff; color: var(--color-route); }
+  .kiosk-menu { display: grid; gap: 1.6vmin; }
+  .kiosk-menu button {
+    display: grid;
+    justify-items: center;
+    gap: 0.5vmin;
+    padding: 2vmin 1vmin;
+    border: 0;
+    border-radius: 1.6vmin;
+    background: #fff;
+    color: var(--color-route);
+    font: inherit;
+  }
+  .kiosk-menu button[aria-pressed="true"] { background: var(--color-signal); }
+  .kiosk-menu strong { font-size: 3vmin; font-weight: 600; }
+  .kiosk-menu small { font-size: 1.8vmin; color: var(--color-route-soft); }
+  .kiosk-menu button[aria-pressed="true"] small { color: var(--color-route); }
+  .kiosk-icon { width: 5vmin; height: 5vmin; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; stroke-linecap: round; }
+  .kiosk-footer { margin-top: auto; font-size: 1.8vmin; opacity: 0.75; }
+  .kiosk-program {
+    position: absolute;
+    inset: 0;
+    overflow-y: auto;
+    padding: 6vmin 5vmin;
+    box-sizing: border-box;
+    background: var(--color-hall);
+    color: var(--color-route);
+    text-align: start;
+  }
+  .kiosk-program h1 { margin: 0; font-size: 6vmin; font-weight: 700; }
+  .kiosk-day { margin: 1vmin 0 4vmin; font-size: 3vmin; color: var(--color-route-soft); }
+  .kiosk-empty { margin-top: 4vmin; font-size: 3.6vmin; }
+  .kiosk-program ol { display: grid; gap: 1.6vmin; margin: 0; padding: 0; list-style: none; }
+  .kiosk-program li {
+    display: grid;
+    grid-template-columns: 17vmin minmax(0, 1fr);
+    gap: 2.4vmin;
+    align-items: start;
+    padding: 2.6vmin;
+    border-radius: 1.6vmin;
+    background: #fff;
+  }
+  .kiosk-program li[data-state="past"] { opacity: 0.5; }
+  .kiosk-program li[data-state="now"] { background: var(--color-route); color: #fff; }
+  .kiosk-program time { font-size: 2.8vmin; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .kiosk-program li > div { display: grid; gap: 0.8vmin; }
+  .kiosk-program strong { font-size: 3.4vmin; font-weight: 600; line-height: 1.35; }
+  .kiosk-program li span:not(.kiosk-badge) { font-size: 2.4vmin; opacity: 0.8; }
+  .kiosk-badge {
+    justify-self: start;
+    padding: 0.4vmin 1.6vmin;
+    border-radius: 0.8vmin;
+    background: var(--color-signal);
+    color: var(--color-route);
+    font-size: 2vmin;
+    font-weight: 700;
+  }
   .announce {
     position: absolute;
     inset: 0;
@@ -252,6 +355,9 @@
   .schedule-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; margin-top: 0.4rem; }
   .schedule-actions button { min-height: 2.75rem; border: 1px solid var(--color-route); border-radius: 0.4rem; background: #fff; color: var(--color-route); }
   .schedule-actions .danger { border-color: var(--color-stop); color: var(--color-stop); }
+  .translation { display: grid; gap: 0.75rem; padding: 0.75rem; border: 1px solid #d6dce7; border-radius: 0.4rem; }
+  .translation summary { min-height: 2.75rem; display: flex; align-items: center; font-weight: 500; cursor: pointer; }
+  .form .check-list input[type="radio"] { border-radius: 50%; }
   .delivery-list { display: grid; margin: 0; padding: 0; list-style: none; }
   .delivery-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid #e3e7ef; }
   .delivery-list strong { font-weight: 500; }

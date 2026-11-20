@@ -21,12 +21,31 @@ export interface ManifestProgram {
   items: ManifestItem[];
 }
 
+export type KioskLanguage = "ar" | "fr" | "en";
+
+export interface AgendaEntry {
+  id: string;
+  title: string;
+  speaker: string | null;
+  place: string | null;
+  starts_at: string;
+  ends_at: string | null;
+  translations: Partial<Record<KioskLanguage, { title?: string; speaker?: string; place?: string }>>;
+}
+
+export interface ManifestKiosk {
+  languages: KioskLanguage[];
+  logo: ManifestAsset | null;
+  agenda: AgendaEntry[];
+}
+
 export interface ManifestContract {
   id: string;
   title: string;
   starts_at: string;
   ends_at: string;
   program: ManifestProgram;
+  kiosk?: ManifestKiosk | null;
 }
 
 export interface ManifestSchedule {
@@ -87,6 +106,10 @@ export async function installManifest(
         if (item.asset) assets.set(item.asset.id, item.asset);
       }),
   );
+  (manifest.contracts ?? []).forEach((contract) => {
+    const logo = contract.kiosk?.logo;
+    if (logo) assets.set(logo.id, logo);
+  });
 
   let ready = 0;
   onProgress(ready, assets.size);

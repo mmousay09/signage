@@ -8,6 +8,7 @@ import { unlockAudio } from "@/player/audio/audio";
 import { resolveContent } from "@/player/engine/schedule";
 import { registerPlayerWorker } from "@/player/offline/store";
 import { useScreenConnection } from "@/player/sync/useScreenConnection";
+import { KioskShell } from "@/player/kiosk/KioskShell";
 import { ContentStage } from "@/player/zones/ContentStage";
 
 export function PlayerApp() {
@@ -41,22 +42,36 @@ export function PlayerApp() {
     <main className="player" data-phase={screen.phase} onPointerDown={handleTouch}>
       <audio id="player-chime" src="/sounds/chime.wav" preload="auto" />
 
-      {resolved?.kind === "program" && screen.manifest && (
-        <ContentStage
-          key={resolved.key}
-          content={{
-            version: resolved.version,
-            organization: screen.manifest.organization,
-            program: resolved.program,
-          }}
-        />
-      )}
-
-      {resolved?.kind === "contract-empty" && (
-        <section className="available">
-          <h1>{resolved.title}</h1>
-        </section>
-      )}
+      {resolved && resolved.kind !== "available" && screen.manifest && (() => {
+        const stage =
+          resolved.kind === "program" ? (
+            <ContentStage
+              key={resolved.key}
+              content={{
+                version: resolved.version,
+                organization: screen.manifest.organization,
+                program: resolved.program,
+              }}
+            />
+          ) : (
+            <section className="available">
+              <h1>{resolved.title}</h1>
+            </section>
+          );
+        return resolved.kiosk ? (
+          <KioskShell
+            key={resolved.key}
+            kiosk={resolved.kiosk.data}
+            title={resolved.kiosk.contractTitle}
+            organization={screen.manifest.organization}
+            now={clock + screen.clockOffset}
+          >
+            {stage}
+          </KioskShell>
+        ) : (
+          stage
+        );
+      })()}
 
       {resolved?.kind === "available" && screen.manifest && (
         <section className="available">

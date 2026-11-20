@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import { contractState, toLocalInput, type ContractStatus } from "./format";
+import { KioskSettings, type AgendaRow, type KioskConfig } from "./KioskSettings";
 
 export interface ContractDetails {
   id: string;
@@ -31,11 +32,17 @@ export function ContractDetail({
   playlistId,
   screens,
   assigned,
+  kiosk,
+  images,
+  agenda,
 }: {
   contract: ContractDetails;
   playlistId: string | null;
   screens: { id: string; name: string | null }[];
   assigned: string[];
+  kiosk: KioskConfig;
+  images: { id: string; name: string }[];
+  agenda: AgendaRow[];
 }) {
   const router = useRouter();
   const [now, setNow] = useState<number | null>(null);
@@ -179,6 +186,15 @@ export function ContractDetail({
           تأكيد العقد
         </button>
       )}
+
+      <KioskSettings
+        contractId={contract.id}
+        orgId={contract.org_id}
+        startsAt={contract.starts_at}
+        config={kiosk}
+        images={images}
+        agenda={agenda}
+      />
 
       <section className="assign-section">
         <h2>رابط المستأجر</h2>
