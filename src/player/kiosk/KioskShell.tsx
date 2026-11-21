@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { QrCode } from "@/components/ui/QrCode";
 import { badgeUrl, flushGuestQueue, registerGuest, type GuestInput } from "@/player/kiosk/guests";
+import { speak, stopSpeaking } from "@/player/audio/speech";
 import {
   dayKey,
   dirFor,
@@ -10,15 +11,23 @@ import {
   formatTime,
   LANGUAGE_LABEL,
   localized,
+  localizedAnswer,
   textFor,
   type KioskText,
 } from "@/player/kiosk/i18n";
-import { getAssetUrl, type AgendaEntry, type KioskLanguage, type ManifestKiosk } from "@/player/offline/store";
+import {
+  getAssetUrl,
+  type AgendaEntry,
+  type KioskLanguage,
+  type ManifestAsset,
+  type ManifestAssistant,
+  type ManifestKiosk,
+} from "@/player/offline/store";
 
 /** بعد هذه المدة دون لمس تعود الشاشة إلى العرض واللغة الأولى */
 const IDLE_MS = 60_000;
 
-type View = "home" | "program" | "register" | "badge";
+type View = "home" | "program" | "register" | "badge" | "assistant";
 
 interface Badge {
   code: string;
@@ -27,9 +36,9 @@ interface Badge {
   offline: boolean;
 }
 
-function useLogo(kiosk: ManifestKiosk) {
+function useCachedImage(asset: ManifestAsset | null | undefined) {
   const [url, setUrl] = useState<string | null>(null);
-  const logoId = kiosk.logo?.id;
+  const logoId = asset?.id;
   useEffect(() => {
     let active = true;
     let objectUrl: string | null = null;
@@ -111,6 +120,81 @@ function ProgramView({
           );
         })}
       </ol>
+    </section>
+  );
+}
+
+function askLabel(language: KioskLanguage, name: string) {
+  return language === "ar" ? `اسأل ${name}` : language === "fr" ? `Demander à ${name}` : `Ask ${name}`;
+}
+
+function AssistantView({
+  assistant,
+  language,
+  text,
+}: {
+  assistant: ManifestAssistant;
+  language: KioskLanguage;
+  text: KioskText;
+}) {
+  const avatar = useCachedImage(assistant.avatar);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [speaking, setSpeaking] = useState(false);
+  const chosen = assistant.answers.find((entry) => entry.id === selected);
+  const label = chosen ? localizedAnswer(chosen, language) : null;
+
+  const say = async (value: string, voice: KioskLanguage) => {
+    setSpeaking(true);
+    await speak(value, voice);
+    setSpeaking(false);
+  };
+  useEffect(() => () => stopSpeaking(), []);
+
+  return (
+    <section className="kiosk-assistant" dir={dirFor(language)}>
+      <header data-speaking={speaking}>
+        {avatar ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={avatar} alt={assistant.name} />
+        ) : (
+          <span className="kiosk-assistant-initial" aria-hidden="true">{assistant.name.slice(0, 1)}</span>
+        )}
+        <div>
+          <h1>{text.greeting.replace("{name}", assistant.name)}</h1>
+          <p>{text.chooseQuestion}</p>
+        </div>
+      </header>
+
+      {label && (
+        <div className="kiosk-answer" aria-live="polite">
+          <strong>{label.question}</strong>
+          <p>{label.answer}</p>
+          <button type="button" onClick={() => void say(label.answer, label.answerLanguage)} disabled={speaking}>
+            {text.listenAgain}
+          </button>
+        </div>
+      )}
+
+      <ul className="kiosk-questions">
+        {assistant.answers.map((entry) => {
+          const item = localizedAnswer(entry, language);
+          return (
+            <li key={entry.id}>
+              <button
+                type="button"
+                aria-pressed={entry.id === selected}
+                onClick={() => {
+                  setSelected(entry.id);
+                  stopSpeaking();
+                  void say(item.answer, item.answerLanguage);
+                }}
+              >
+                {item.question}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }
@@ -241,10 +325,11 @@ export function KioskShell({
   const [language, setLanguage] = useState<KioskLanguage>(languages[0]);
   const [view, setView] = useState<View>("home");
   const idleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const logo = useLogo(kiosk);
+  const logo = useCachedImage(kiosk.logo);
   const text = textFor(language);
   const hasProgram = kiosk.agenda.length > 0;
   const canRegister = Boolean(kiosk.registration);
+  const assistant = kiosk.assistant && kiosk.assistant.answers.length > 0 ? kiosk.assistant : null;
   const [badge, setBadge] = useState<Badge | null>(null);
 
   // التسجيلات المحفوظة دون إنترنت تُرسل عند عودة الاتصال
@@ -288,6 +373,8 @@ export function KioskShell({
               setView("badge");
             }}
           />
+        ) : view === "assistant" && assistant ? (
+          <AssistantView assistant={assistant} language={activeLanguage} text={text} />
         ) : view === "badge" && badge ? (
           <BadgeView
             badge={badge}
@@ -350,6 +437,16 @@ export function KioskShell({
               </svg>
               <strong>{text.register}</strong>
               <small>{text.registerHint}</small>
+            </button>
+          )}
+          {assistant && (
+            <button type="button" aria-pressed={view === "assistant"} onClick={() => setView("assistant")}>
+              <svg className="kiosk-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H11l-5 4v-4h0A2 2 0 0 1 4 14z" />
+                <path d="M10 8.2a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9v.5M12 13.2v.1" />
+              </svg>
+              <strong>{askLabel(activeLanguage, assistant.name)}</strong>
+              <small>{text.askHint}</small>
             </button>
           )}
           <button type="button" aria-pressed={view === "home"} onClick={() => setView("home")}>

@@ -13,7 +13,16 @@ export interface StageContent {
   program: ManifestProgram;
 }
 
-export function ContentStage({ content }: { content: StageContent }) {
+export function ContentStage({
+  content,
+  onPlayed,
+}: {
+  content: StageContent;
+  /** يُستدعى بعد انتهاء عرض كل مادة بمدة عرضها الفعلية */
+  onPlayed?: (itemKey: string, label: string, ms: number) => void;
+}) {
+  const onPlayedRef = useRef(onPlayed);
+  onPlayedRef.current = onPlayed;
   const latest = useRef(content);
   const [playback, setPlayback] = useState({ content, index: 0, tick: 0 });
   const [media, setMedia] = useState<{ itemId: string; url: string | null } | null>(null);
@@ -66,8 +75,18 @@ export function ContentStage({ content }: { content: StageContent }) {
         ? (item.asset?.duration_ms ?? VIDEO_FALLBACK_MS) + VIDEO_GRACE_MS
         : (item.duration_ms ?? DEFAULT_ITEM_MS);
     const timer = setTimeout(() => advanceRef.current(), duration);
-    return () => clearTimeout(timer);
-  }, [item, ready, missing, playback.tick]);
+    const started = Date.now();
+    return () => {
+      clearTimeout(timer);
+      if (missing) return;
+      const position = playback.content.program.items.indexOf(item) + 1;
+      const label =
+        item.kind === "text"
+          ? `نص: ${(item.body ?? "").slice(0, 60)}`
+          : `${item.kind === "video" ? "فيديو" : "صورة"} رقم ${position}`;
+      onPlayedRef.current?.(item.id, label, Math.min(Date.now() - started, duration));
+    };
+  }, [item, ready, missing, playback.tick, playback.content]);
 
   useEffect(() => {
     const video = videoRef.current;

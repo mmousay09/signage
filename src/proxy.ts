@@ -7,7 +7,7 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // الشاشة والمستأجر يديران جلستهما داخل المتصفح، وبطاقة الضيف عامة
-  if (pathname === "/play" || pathname.startsWith("/play/") || pathname.startsWith("/r/") || pathname.startsWith("/b/")) {
+  if (pathname === "/play" || pathname.startsWith("/play/") || pathname.startsWith("/r/") || pathname.startsWith("/b/") || pathname.startsWith("/q/")) {
     return NextResponse.next();
   }
 

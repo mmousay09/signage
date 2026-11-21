@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { ContractDetail, type ContractDetails } from "@/features/contracts/ContractDetail";
+import type { AnswerRow } from "@/features/contracts/ContractExtras";
 import type { AgendaRow, GuestRow, KioskConfig } from "@/features/contracts/KioskSettings";
 import { getAdminContext } from "@/lib/admin";
 
@@ -8,13 +9,13 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
   const { supabase, org } = await getAdminContext();
   const { data: contract } = await supabase
     .from("contracts")
-    .select("id, org_id, client_id, title, starts_at, ends_at, status, interactive, languages, logo_asset_id, registration_enabled")
+    .select("id, org_id, client_id, title, starts_at, ends_at, status, interactive, languages, logo_asset_id, registration_enabled, qr_url, qr_caption, assistant_enabled, assistant_name, assistant_asset_id")
     .eq("org_id", org.id)
     .eq("id", id)
     .maybeSingle();
   if (!contract) notFound();
 
-  const [{ data: client }, { data: playlist }, { data: screens }, { data: links }, { data: images }, { data: agenda }, { data: guests }] =
+  const [{ data: client }, { data: playlist }, { data: screens }, { data: links }, { data: images }, { data: agenda }, { data: guests }, { data: answers }, { count: qrScans }] =
     await Promise.all([
     supabase.from("clients").select("name, phone").eq("id", contract.client_id).maybeSingle(),
     supabase.from("playlists").select("id").eq("contract_id", id).order("created_at").limit(1).maybeSingle(),
@@ -37,6 +38,13 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
       .select("id, badge_code, full_name, organization, job_title, phone, email, created_at, checked_in_at")
       .eq("contract_id", id)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("assistant_answers")
+      .select("id, question, answer, translations")
+      .eq("contract_id", id)
+      .order("position")
+      .order("created_at"),
+    supabase.from("qr_scans").select("id", { count: "exact", head: true }).eq("contract_id", id),
   ]);
 
   return (
@@ -58,6 +66,17 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
       images={(images ?? []) as { id: string; name: string }[]}
       agenda={(agenda ?? []) as AgendaRow[]}
       guests={(guests ?? []) as GuestRow[]}
+      answers={(answers ?? []) as AnswerRow[]}
+      extras={{
+        qr_url: (contract.qr_url as string | null) ?? null,
+        qr_caption: (contract.qr_caption as string | null) ?? null,
+        qr_scans: qrScans ?? 0,
+        interactive: Boolean(contract.interactive),
+        languages: (contract.languages as KioskConfig["languages"] | null) ?? ["ar"],
+        assistant_enabled: Boolean(contract.assistant_enabled),
+        assistant_name: (contract.assistant_name as string | null) ?? null,
+        assistant_asset_id: (contract.assistant_asset_id as string | null) ?? null,
+      }}
     />
   );
 }

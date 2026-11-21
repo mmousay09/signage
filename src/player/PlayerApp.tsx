@@ -8,6 +8,8 @@ import { unlockAudio } from "@/player/audio/audio";
 import { resolveContent } from "@/player/engine/schedule";
 import { registerPlayerWorker } from "@/player/offline/store";
 import { useScreenConnection } from "@/player/sync/useScreenConnection";
+import { setPronunciations } from "@/player/audio/speech";
+import { recordPlay } from "@/player/engine/plays";
 import { KioskShell } from "@/player/kiosk/KioskShell";
 import { ContentStage } from "@/player/zones/ContentStage";
 
@@ -31,6 +33,9 @@ export function PlayerApp() {
     void registerPlayerWorker();
   }, []);
 
+  const pronunciations = screen.manifest?.pronunciations;
+  useEffect(() => setPronunciations(pronunciations), [pronunciations]);
+
   const handleTouch = async () => {
     screen.setAudio(await unlockAudio());
     if (!document.fullscreenElement) {
@@ -52,12 +57,28 @@ export function PlayerApp() {
                 organization: screen.manifest.organization,
                 program: resolved.program,
               }}
+              onPlayed={
+                resolved.contract
+                  ? (itemKey, label, ms) => recordPlay(resolved.contract!.id, itemKey, label, ms)
+                  : undefined
+              }
             />
           ) : (
             <section className="available">
               <h1>{resolved.title}</h1>
             </section>
           );
+        const qr =
+          resolved.contract?.qr && screen.manifest.screen_id ? (
+            <aside className="qr-corner" data-kiosk={Boolean(resolved.kiosk)}>
+              <QrCode
+                value={`${window.location.origin}/q/${resolved.contract.id}?s=${screen.manifest.screen_id}`}
+                label={resolved.contract.qr.caption}
+                className="qr-corner-code"
+              />
+              <span>{resolved.contract.qr.caption}</span>
+            </aside>
+          ) : null;
         return resolved.kiosk ? (
           <KioskShell
             key={resolved.key}
@@ -68,9 +89,13 @@ export function PlayerApp() {
             now={clock + screen.clockOffset}
           >
             {stage}
+            {qr}
           </KioskShell>
         ) : (
-          stage
+          <>
+            {stage}
+            {qr}
+          </>
         );
       })()}
 

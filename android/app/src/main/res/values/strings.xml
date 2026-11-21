@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">مشغّل الشاشات</string>
+    <string name="settings_title">إعدادات المشغّل</string>
+    <string name="settings_message">النسخة %1$s. رابط صفحة الشاشة:</string>
+    <string name="save">حفظ</string>
+    <string name="reload">إعادة التحميل</string>
+    <string name="exit">خروج</string>
+</resources>
