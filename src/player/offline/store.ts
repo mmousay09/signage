@@ -35,6 +35,7 @@ export interface AgendaEntry {
 
 export interface ManifestKiosk {
   languages: KioskLanguage[];
+  registration?: boolean;
   logo: ManifestAsset | null;
   agenda: AgendaEntry[];
 }

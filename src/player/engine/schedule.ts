@@ -4,7 +4,7 @@ export type ResolvedContent = (
   | { kind: "program"; key: string; version: string; program: ManifestProgram }
   | { kind: "contract-empty"; key: string; title: string }
   | { kind: "available"; key: "available" }
-) & { kiosk?: { contractTitle: string; data: ManifestKiosk } };
+) & { kiosk?: { contractId: string; contractTitle: string; data: ManifestKiosk } };
 
 export function resolveContent(manifest: PlayerManifest, now: number): ResolvedContent {
   const contract = manifest.contracts?.find(
@@ -12,7 +12,7 @@ export function resolveContent(manifest: PlayerManifest, now: number): ResolvedC
   );
   if (contract) {
     const key = `contract:${contract.id}`;
-    const kiosk = contract.kiosk ? { contractTitle: contract.title, data: contract.kiosk } : undefined;
+    const kiosk = contract.kiosk ? { contractId: contract.id, contractTitle: contract.title, data: contract.kiosk } : undefined;
     return contract.program.items.length
       ? { kind: "program", key, version: `${manifest.version}:${key}`, program: contract.program, kiosk }
       : { kind: "contract-empty", key, title: contract.title, kiosk };

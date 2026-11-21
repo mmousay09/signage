@@ -62,6 +62,7 @@ export function PlayerApp() {
           <KioskShell
             key={resolved.key}
             kiosk={resolved.kiosk.data}
+            contractId={resolved.kiosk.contractId}
             title={resolved.kiosk.contractTitle}
             organization={screen.manifest.organization}
             now={clock + screen.clockOffset}

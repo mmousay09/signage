@@ -6,8 +6,8 @@ import { supabaseKey, supabaseUrl } from "@/lib/supabase/config";
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // الشاشة والمستأجر يديران جلستهما داخل المتصفح
-  if (pathname === "/play" || pathname.startsWith("/play/") || pathname.startsWith("/r/")) {
+  // الشاشة والمستأجر يديران جلستهما داخل المتصفح، وبطاقة الضيف عامة
+  if (pathname === "/play" || pathname.startsWith("/play/") || pathname.startsWith("/r/") || pathname.startsWith("/b/")) {
     return NextResponse.next();
   }
 
