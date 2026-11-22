@@ -28,6 +28,7 @@ const dateTime = new Intl.DateTimeFormat("ar-LY-u-nu-latn", {
 const day = new Intl.DateTimeFormat("ar-LY-u-nu-latn", { timeZone: "UTC", weekday: "long", day: "numeric", month: "long" });
 
 function duration(ms: number) {
+  if (ms < 60_000) return `${number.format(Math.round(ms / 1000))} ثانية`;
   const minutes = Math.round(ms / 60_000);
   if (minutes < 60) return `${number.format(minutes)} دقيقة`;
   const hours = Math.floor(minutes / 60);
