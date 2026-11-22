@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { OfflineAlerts } from "@/features/alerts/OfflineAlerts";
+import { AdminNav } from "@/features/navigation/AdminNav";
 import { SignOutButton } from "@/features/screens/SignOutButton";
 import { getAdminContext } from "@/lib/admin";
 
@@ -15,13 +16,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           <SignOutButton />
         </div>
       </header>
-      <nav className="admin-nav" aria-label="أقسام لوحة التحكم">
-        <Link href="/dashboard">الشاشات</Link>
-        <Link href="/contracts">العقود</Link>
-        <Link href="/playlists">القوائم</Link>
-        <Link href="/media">الوسائط</Link>
-        <Link href="/announcements">الإعلانات</Link>
-      </nav>
+      <AdminNav />
       <OfflineAlerts orgId={org.id} />
       {children}
     </div>
