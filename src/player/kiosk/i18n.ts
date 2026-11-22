@@ -1,4 +1,4 @@
-import type { AgendaEntry, KioskLanguage } from "@/player/offline/store";
+import type { AgendaEntry, AssistantAnswer, KioskLanguage } from "@/player/offline/store";
 
 export const LANGUAGE_LABEL: Record<KioskLanguage, string> = { ar: "ع", fr: "FR", en: "EN" };
 
@@ -15,6 +15,27 @@ const TEXT = {
     next: "التالي",
     ended: "انتهى برنامج الفعالية",
     back: "رجوع",
+    askHint: "أسئلة شائعة",
+    greeting: "مرحبًا، أنا {name}",
+    chooseQuestion: "اختر سؤالك وسأجيبك",
+    listenAgain: "أعد الاستماع",
+    register: "التسجيل",
+    registerHint: "ضيف جديد",
+    registerTitle: "تسجيل ضيف جديد",
+    fullName: "الاسم الكامل",
+    organization: "الجهة",
+    jobTitle: "الصفة",
+    phone: "رقم الهاتف",
+    email: "البريد الإلكتروني",
+    optional: "اختياري",
+    submit: "سجّلني",
+    saving: "جارٍ التسجيل",
+    badgeReady: "بطاقتك جاهزة",
+    badgeHint: "امسح الرمز بهاتفك لحفظ بطاقتك، واعرضها عند الدخول.",
+    badgeOffline: "حُفظ تسجيلك، وتعمل البطاقة على هاتفك بعد عودة الاتصال.",
+    badgeCode: "رمز البطاقة",
+    done: "تم",
+    closed: "التسجيل مغلق حاليًا. يرجى مراجعة مكتب الاستقبال.",
   },
   fr: {
     language: "Langue",
@@ -28,6 +49,27 @@ const TEXT = {
     next: "Ensuite",
     ended: "Le programme est terminé",
     back: "Retour",
+    askHint: "Questions fréquentes",
+    greeting: "Bonjour, je suis {name}",
+    chooseQuestion: "Choisissez votre question",
+    listenAgain: "Réécouter",
+    register: "Inscription",
+    registerHint: "Nouvel invité",
+    registerTitle: "Inscription d'un invité",
+    fullName: "Nom complet",
+    organization: "Organisme",
+    jobTitle: "Fonction",
+    phone: "Téléphone",
+    email: "E-mail",
+    optional: "facultatif",
+    submit: "M'inscrire",
+    saving: "Inscription en cours",
+    badgeReady: "Votre badge est prêt",
+    badgeHint: "Scannez le code avec votre téléphone pour garder votre badge et présentez-le à l'entrée.",
+    badgeOffline: "Votre inscription est enregistrée. Le badge sera disponible sur votre téléphone dès le retour de la connexion.",
+    badgeCode: "Code du badge",
+    done: "Terminé",
+    closed: "Les inscriptions sont fermées. Merci de vous adresser à l'accueil.",
   },
   en: {
     language: "Language",
@@ -41,6 +83,27 @@ const TEXT = {
     next: "Next",
     ended: "The program has ended",
     back: "Back",
+    askHint: "Common questions",
+    greeting: "Hello, I'm {name}",
+    chooseQuestion: "Choose your question",
+    listenAgain: "Listen again",
+    register: "Register",
+    registerHint: "New guest",
+    registerTitle: "Guest registration",
+    fullName: "Full name",
+    organization: "Organization",
+    jobTitle: "Job title",
+    phone: "Phone number",
+    email: "Email",
+    optional: "optional",
+    submit: "Register me",
+    saving: "Registering",
+    badgeReady: "Your badge is ready",
+    badgeHint: "Scan the code with your phone to keep your badge, and show it at the entrance.",
+    badgeOffline: "Your registration is saved. The badge will open on your phone once the connection is back.",
+    badgeCode: "Badge code",
+    done: "Done",
+    closed: "Registration is closed. Please visit the reception desk.",
   },
 } satisfies Record<KioskLanguage, Record<string, string>>;
 
@@ -82,5 +145,15 @@ export function localized(entry: AgendaEntry, language: KioskLanguage) {
     title: translated?.title || entry.title,
     speaker: translated?.speaker || entry.speaker,
     place: translated?.place || entry.place,
+  };
+}
+
+export function localizedAnswer(entry: AssistantAnswer, language: KioskLanguage) {
+  const translated = language === "ar" ? undefined : entry.translations?.[language];
+  return {
+    question: translated?.question || entry.question,
+    answer: translated?.answer || entry.answer,
+    // يُنطق الجواب بلغة نصه الفعلية
+    answerLanguage: (translated?.answer ? language : "ar") as KioskLanguage,
   };
 }

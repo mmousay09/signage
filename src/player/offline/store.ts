@@ -33,8 +33,23 @@ export interface AgendaEntry {
   translations: Partial<Record<KioskLanguage, { title?: string; speaker?: string; place?: string }>>;
 }
 
+export interface AssistantAnswer {
+  id: string;
+  question: string;
+  answer: string;
+  translations: Partial<Record<KioskLanguage, { question?: string; answer?: string }>>;
+}
+
+export interface ManifestAssistant {
+  name: string;
+  avatar: ManifestAsset | null;
+  answers: AssistantAnswer[];
+}
+
 export interface ManifestKiosk {
   languages: KioskLanguage[];
+  registration?: boolean;
+  assistant?: ManifestAssistant | null;
   logo: ManifestAsset | null;
   agenda: AgendaEntry[];
 }
@@ -46,6 +61,7 @@ export interface ManifestContract {
   ends_at: string;
   program: ManifestProgram;
   kiosk?: ManifestKiosk | null;
+  qr?: { caption: string } | null;
 }
 
 export interface ManifestSchedule {
@@ -69,6 +85,8 @@ export interface PlayerManifest {
   idle?: ManifestProgram | null;
   contracts?: ManifestContract[];
   schedules?: ManifestSchedule[];
+  screen_id?: string;
+  pronunciations?: { term: string; spoken: string }[];
   program: ManifestProgram;
 }
 
@@ -109,6 +127,8 @@ export async function installManifest(
   (manifest.contracts ?? []).forEach((contract) => {
     const logo = contract.kiosk?.logo;
     if (logo) assets.set(logo.id, logo);
+    const avatar = contract.kiosk?.assistant?.avatar;
+    if (avatar) assets.set(avatar.id, avatar);
   });
 
   let ready = 0;

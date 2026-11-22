@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { formatDateTime } from "@/features/contracts/format";
+import { whatsappLink } from "@/lib/whatsapp";
 import { getRenterClient } from "@/lib/supabase/renter";
 
 const MAX_BYTES = 50 * 1024 * 1024;
@@ -38,6 +39,7 @@ interface PortalData {
   screens: string[];
   items: Item[];
   assets: Record<string, Asset>;
+  contact: { organization: string; contact_phone: string | null } | null;
 }
 
 async function loadPortal(token: string): Promise<PortalData> {
@@ -51,10 +53,11 @@ async function loadPortal(token: string): Promise<PortalData> {
   const { data: contractId, error } = await supabase.rpc("redeem_renter_invite", { p_token: token });
   if (error) throw error;
 
-  const [{ data: contract }, { data: playlist }, { data: links }] = await Promise.all([
+  const [{ data: contract }, { data: playlist }, { data: links }, { data: contact }] = await Promise.all([
     supabase.from("contracts").select("id, org_id, title, starts_at, ends_at, status").eq("id", contractId).single(),
     supabase.from("playlists").select("id").eq("contract_id", contractId).order("created_at").limit(1).single(),
     supabase.from("contract_screens").select("screen_id").eq("contract_id", contractId),
+    supabase.rpc("renter_contact", { p_contract: contractId }),
   ]);
   if (!contract || !playlist) throw new Error("not_found");
 
@@ -84,7 +87,42 @@ async function loadPortal(token: string): Promise<PortalData> {
     assets: Object.fromEntries(
       assetRows.map((asset) => [asset.id, { ...asset, url: urls.get(asset.storage_path) ?? null }]),
     ),
+    contact: (contact as PortalData["contact"]) ?? null,
   };
+}
+
+function RenewalNotice({
+  contract,
+  contact,
+  now,
+}: {
+  contract: Contract;
+  contact: PortalData["contact"];
+  now: number | null;
+}) {
+  if (now === null || !contact) return null;
+  const left = Date.parse(contract.ends_at) - now;
+  if (left <= 0 || left > 3 * 86_400_000) return null;
+  const message = `مرحبًا، أرغب في تجديد عقد «${contract.title}» الذي ينتهي ${formatDateTime(contract.ends_at)}.`;
+  const whatsapp = whatsappLink(contact.contact_phone, message);
+  return (
+    <section className="renewal" role="status">
+      <strong>ينتهي عقدك {formatDateTime(contract.ends_at)}</strong>
+      <p>بعد انتهائه تتوقف إعلاناتك على الشاشات. للتجديد تواصل مع {contact.organization}.</p>
+      {contact.contact_phone && (
+        <div className="button-row">
+          {whatsapp && (
+            <a className="whatsapp" href={whatsapp} target="_blank" rel="noreferrer">
+              اطلب التجديد على واتساب
+            </a>
+          )}
+          <a className="button-quiet-blue" href={`tel:${contact.contact_phone}`}>
+            اتصل
+          </a>
+        </div>
+      )}
+    </section>
+  );
 }
 
 export function RenterPortal({ token }: { token: string }) {
@@ -233,6 +271,8 @@ export function RenterPortal({ token }: { token: string }) {
             ? `يمكنك التعديل حتى ${formatDateTime(contract.ends_at)}`
             : `التعديل متاح من ${formatDateTime(contract.starts_at)} إلى ${formatDateTime(contract.ends_at)}`}
         </p>
+
+        <RenewalNotice contract={contract} contact={data.contact} now={now} />
 
         {items.length === 0 ? (
           <p className="board-empty">لا يوجد محتوى بعد.</p>
