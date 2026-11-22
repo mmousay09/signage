@@ -28,6 +28,8 @@ export function PlaylistEditor({
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [picking, setPicking] = useState(false);
+  const [chosen, setChosen] = useState<string[]>([]);
+  const inList = new Set(items.map((item) => item.asset_id).filter(Boolean));
   const assetById = new Map(assets.map((asset) => [asset.id, asset]));
   const nextPosition = Math.max(0, ...items.map((item) => item.position)) + 1;
 
@@ -41,17 +43,31 @@ export function PlaylistEditor({
 
   const supabase = () => createClient();
 
-  function addAsset(asset: MediaAsset) {
+  function toggleChosen(id: string) {
+    setChosen((current) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id]));
+  }
+
+  // تُضاف كل المواد المختارة دفعة واحدة، بترتيب اختيارها
+  function addChosen() {
+    const picked = chosen.map((id) => assetById.get(id)).filter((asset): asset is MediaAsset => Boolean(asset));
+    if (!picked.length) return;
     setPicking(false);
-    void run(() =>
-      supabase().from("playlist_items").insert({
-        org_id: orgId,
-        playlist_id: playlist.id,
-        position: nextPosition,
-        kind: asset.kind,
-        asset_id: asset.id,
-        duration_ms: asset.kind === "image" ? DEFAULT_SECONDS * 1000 : null,
-      }),
+    setChosen([]);
+    void run(
+      () =>
+        supabase()
+          .from("playlist_items")
+          .insert(
+            picked.map((asset, index) => ({
+              org_id: orgId,
+              playlist_id: playlist.id,
+              position: nextPosition + index,
+              kind: asset.kind,
+              asset_id: asset.id,
+              duration_ms: asset.kind === "image" ? DEFAULT_SECONDS * 1000 : null,
+            })),
+          ),
+      picked.length === 1 ? "أُضيفت مادة واحدة" : `أُضيفت ${picked.length} مواد`,
     );
   }
 
@@ -170,8 +186,15 @@ export function PlaylistEditor({
         </ol>
       )}
 
-      <button className="button-scan" type="button" onClick={() => setPicking((value) => !value)}>
-        إضافة صورة أو فيديو
+      <button
+        className="button-scan"
+        type="button"
+        onClick={() => {
+          setPicking((value) => !value);
+          setChosen([]);
+        }}
+      >
+        {picking ? "إغلاق المكتبة" : "إضافة صور أو فيديوهات"}
       </button>
       {picking &&
         (assets.length === 0 ? (
@@ -179,15 +202,43 @@ export function PlaylistEditor({
             المكتبة فارغة. <Link href="/media">ارفع ملفًا أولًا</Link>
           </p>
         ) : (
-          <ul className="media-grid">
-            {assets.map((asset) => (
-              <li key={asset.id}>
-                <MediaThumb asset={asset} />
-                <strong>{asset.name}</strong>
-                <button disabled={busy} onClick={() => addAsset(asset)}>إضافة</button>
-              </li>
-            ))}
-          </ul>
+          <section className="picker" aria-label="اختيار من المكتبة">
+            <div className="picker-bar">
+              <span>اضغط على الصور لاختيارها، ثم أضفها كلها مرة واحدة.</span>
+              <button
+                type="button"
+                onClick={() => setChosen(chosen.length === assets.length ? [] : assets.map((asset) => asset.id))}
+              >
+                {chosen.length === assets.length ? "إلغاء الكل" : "اختر الكل"}
+              </button>
+            </div>
+            <ul className="media-grid">
+              {assets.map((asset) => {
+                const order = chosen.indexOf(asset.id);
+                return (
+                  <li key={asset.id}>
+                    <button
+                      type="button"
+                      className="pick"
+                      aria-pressed={order >= 0}
+                      disabled={busy}
+                      onClick={() => toggleChosen(asset.id)}
+                    >
+                      <MediaThumb asset={asset} />
+                      {order >= 0 && <span className="pick-mark">{order + 1}</span>}
+                      <strong>{asset.name}</strong>
+                      {inList.has(asset.id) && <small>موجودة في القائمة</small>}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="picker-submit">
+              <button className="button-primary" type="button" disabled={busy || chosen.length === 0} onClick={addChosen}>
+                {chosen.length ? `إضافة ${chosen.length} إلى القائمة` : "اختر صورة أو أكثر"}
+              </button>
+            </div>
+          </section>
         ))}
 
       <form className="form" onSubmit={addText}>
