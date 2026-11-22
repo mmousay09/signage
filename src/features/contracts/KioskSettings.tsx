@@ -9,49 +9,8 @@ type Language = "ar" | "fr" | "en";
 
 export interface KioskConfig {
   interactive: boolean;
-  registration_enabled: boolean;
   languages: Language[];
   logo_asset_id: string | null;
-}
-
-export interface GuestRow {
-  id: string;
-  badge_code: string;
-  full_name: string;
-  organization: string | null;
-  job_title: string | null;
-  phone: string | null;
-  email: string | null;
-  created_at: string;
-  checked_in_at: string | null;
-}
-
-function downloadGuests(rows: GuestRow[], title: string) {
-  const header = ["الاسم", "الجهة", "الصفة", "الهاتف", "البريد", "رمز البطاقة", "وقت التسجيل", "الحضور"];
-  const quote = (value: string | null) => `"${(value ?? "").replaceAll('"', '""')}"`;
-  const lines = rows.map((row) =>
-    [
-      row.full_name,
-      row.organization,
-      row.job_title,
-      row.phone,
-      row.email,
-      row.badge_code,
-      new Date(row.created_at).toLocaleString("en-GB", { timeZone: "Africa/Tripoli" }),
-      row.checked_in_at ? new Date(row.checked_in_at).toLocaleString("en-GB", { timeZone: "Africa/Tripoli" }) : "",
-    ]
-      .map(quote)
-      .join(","),
-  );
-  // علامة BOM ليفتح Excel الحروف العربية بشكل صحيح
-  const blob = new Blob(["\uFEFF" + [header.map(quote).join(","), ...lines].join("\r\n")], {
-    type: "text/csv;charset=utf-8",
-  });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = `ضيوف - ${title}.csv`;
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(link.href), 1_000);
 }
 
 export interface AgendaRow {
@@ -73,8 +32,6 @@ export function KioskSettings({
   config,
   images,
   agenda,
-  guests,
-  title,
 }: {
   contractId: string;
   orgId: string;
@@ -82,8 +39,6 @@ export function KioskSettings({
   config: KioskConfig;
   images: { id: string; name: string }[];
   agenda: AgendaRow[];
-  guests: GuestRow[];
-  title: string;
 }) {
   const router = useRouter();
   const [interactive, setInteractive] = useState(config.interactive);
@@ -115,7 +70,6 @@ export function KioskSettings({
       .update({
         interactive,
         languages: languages.length ? languages : ["ar"],
-        registration_enabled: interactive && form.get("registration") === "on",
         logo_asset_id: String(form.get("logo") ?? "") || null,
       })
       .eq("id", contractId);
@@ -196,13 +150,6 @@ export function KioskSettings({
                   {LANGUAGE_NAMES[language]}
                 </label>
               ))}
-            </fieldset>
-            <fieldset className="check-list">
-              <legend>تسجيل الضيوف</legend>
-              <label>
-                <input type="checkbox" name="registration" defaultChecked={config.registration_enabled} />
-                زر «التسجيل» على الشاشة مع بطاقة QR لكل ضيف
-              </label>
             </fieldset>
             <label>
               الشعار
@@ -299,40 +246,6 @@ export function KioskSettings({
             ))}
             <button className="button-primary" disabled={busy}>إضافة الجلسة</button>
           </form>
-        </>
-      )}
-
-      {(config.registration_enabled || guests.length > 0) && (
-        <>
-          <h2>الضيوف المسجلون ({guests.length})</h2>
-          {guests.length === 0 ? (
-            <p className="page-note">لم يسجل أحد بعد. تظهر هنا تسجيلات الشاشة فور وصولها.</p>
-          ) : (
-            <>
-              <button type="button" className="button-quiet-blue" onClick={() => downloadGuests(guests, title)}>
-                تنزيل القائمة لـ Excel
-              </button>
-              <ul className="schedule-list">
-                {guests.map((guest) => (
-                  <li key={guest.id}>
-                    <strong>{guest.full_name}</strong>
-                    {(guest.job_title || guest.organization) && (
-                      <span>{[guest.job_title, guest.organization].filter(Boolean).join("، ")}</span>
-                    )}
-                    {(guest.phone || guest.email) && (
-                      <span dir="ltr" className="guest-contact">{[guest.phone, guest.email].filter(Boolean).join(" · ")}</span>
-                    )}
-                    <span>
-                      <a href={`/b/${guest.badge_code}`} target="_blank" rel="noreferrer" dir="ltr">
-                        {guest.badge_code}
-                      </a>
-                      {mounted && <> · {formatDateTime(guest.created_at)}</>}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
         </>
       )}
 

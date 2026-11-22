@@ -4,10 +4,7 @@ export type ResolvedContent = (
   | { kind: "program"; key: string; version: string; program: ManifestProgram }
   | { kind: "contract-empty"; key: string; title: string }
   | { kind: "available"; key: "available" }
-) & {
-  kiosk?: { contractId: string; contractTitle: string; data: ManifestKiosk };
-  contract?: { id: string; qr: { caption: string } | null };
-};
+) & { kiosk?: { contractTitle: string; data: ManifestKiosk } };
 
 export function resolveContent(manifest: PlayerManifest, now: number): ResolvedContent {
   const contract = manifest.contracts?.find(
@@ -15,11 +12,10 @@ export function resolveContent(manifest: PlayerManifest, now: number): ResolvedC
   );
   if (contract) {
     const key = `contract:${contract.id}`;
-    const kiosk = contract.kiosk ? { contractId: contract.id, contractTitle: contract.title, data: contract.kiosk } : undefined;
-    const info = { id: contract.id, qr: contract.qr ?? null };
+    const kiosk = contract.kiosk ? { contractTitle: contract.title, data: contract.kiosk } : undefined;
     return contract.program.items.length
-      ? { kind: "program", key, version: `${manifest.version}:${key}`, program: contract.program, kiosk, contract: info }
-      : { kind: "contract-empty", key, title: contract.title, kiosk, contract: info };
+      ? { kind: "program", key, version: `${manifest.version}:${key}`, program: contract.program, kiosk }
+      : { kind: "contract-empty", key, title: contract.title, kiosk };
   }
 
   // نسخة محفوظة من قبل المرحلة 3 لا تحتوي idle، فتُستخدم قائمتها السابقة

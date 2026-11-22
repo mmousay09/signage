@@ -1,6 +1,5 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { OfflineAlerts } from "@/features/alerts/OfflineAlerts";
 import { AdminNav } from "@/features/navigation/AdminNav";
 import { SignOutButton } from "@/features/screens/SignOutButton";
 import { getAdminContext } from "@/lib/admin";
@@ -17,7 +16,6 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         </div>
       </header>
       <AdminNav />
-      <OfflineAlerts orgId={org.id} />
       {children}
     </div>
   );

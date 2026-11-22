@@ -5,7 +5,6 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabaseKey, supabaseUrl } from "@/lib/supabase/config";
 import { getPlayerClient } from "@/lib/supabase/player";
 import { emitAnnouncement, wasAnnounced } from "@/player/announce/engine";
-import { flushPlays } from "@/player/engine/plays";
 import { getAudioState, playChime, type AudioState } from "@/player/audio/audio";
 import {
   clearStoredContent,
@@ -312,7 +311,6 @@ export function useScreenConnection(): ScreenConnection {
       await processCommands();
       // احتياط إن ضاعت رسالة النداء أثناء انقطاع قصير
       void fetchPendingBroadcasts();
-      void flushPlays(supabase);
       void syncContent();
       return HEARTBEAT_INTERVAL;
     };
