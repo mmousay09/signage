@@ -5,20 +5,45 @@ import { useEffect, useRef, useState } from "react";
 const SCAN_INTERVAL_MS = 150;
 const MAX_FRAME_WIDTH = 720;
 
+export interface ScannerLabels {
+  prompt: string;
+  denied: string;
+  failed: string;
+  close: string;
+}
+
+const DEFAULT_LABELS: ScannerLabels = {
+  prompt: "وجّه الكاميرا إلى رمز QR على الشاشة",
+  denied: "اسمح للمتصفح باستخدام الكاميرا، ثم حاول مرة أخرى.",
+  failed: "تعذر تشغيل الكاميرا. أدخل الرمز يدويًا.",
+  close: "إغلاق",
+};
+
 export function QrScanner({
   onResult,
   onClose,
+  facing = "environment",
+  labels = DEFAULT_LABELS,
+  className = "scanner",
+  onError,
 }: {
   onResult: (text: string) => void;
-  onClose: () => void;
+  onClose?: () => void;
+  /** الخلفية للهاتف، والأمامية لشاشة يقف أمامها الزائر */
+  facing?: "environment" | "user";
+  labels?: ScannerLabels;
+  className?: string;
+  onError?: () => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const resultRef = useRef(onResult);
+  const errorRef = useRef(onError);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     resultRef.current = onResult;
-  }, [onResult]);
+    errorRef.current = onError;
+  }, [onResult, onError]);
 
   useEffect(() => {
     let stopped = false;
@@ -30,7 +55,7 @@ export function QrScanner({
         const { default: jsQR } = await import("jsqr");
         stream = await navigator.mediaDevices.getUserMedia({
           audio: false,
-          video: { facingMode: { ideal: "environment" } },
+          video: { facingMode: { ideal: facing } },
         });
         const video = videoRef.current;
         if (stopped || !video) return;
@@ -60,11 +85,8 @@ export function QrScanner({
         scan();
       } catch (cause) {
         if (stopped) return;
-        setError(
-          cause instanceof DOMException && cause.name === "NotAllowedError"
-            ? "اسمح للمتصفح باستخدام الكاميرا، ثم حاول مرة أخرى."
-            : "تعذر تشغيل الكاميرا. أدخل الرمز يدويًا.",
-        );
+        setError(cause instanceof DOMException && cause.name === "NotAllowedError" ? labels.denied : labels.failed);
+        errorRef.current?.();
       }
     }
 
@@ -74,15 +96,17 @@ export function QrScanner({
       clearTimeout(timer);
       stream?.getTracks().forEach((track) => track.stop());
     };
+    // الكاميرا تُشغَّل مرة واحدة لكل ظهور للماسح
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
-    <div className="scanner" role="dialog" aria-label="مسح رمز QR">
-      <video ref={videoRef} muted playsInline />
+    <div className={className} role={onClose ? "dialog" : undefined} aria-label={labels.prompt}>
+      <video ref={videoRef} muted playsInline data-mirrored={facing === "user"} />
       <div className="scanner-frame" aria-hidden="true" />
       <div className="scanner-bar">
-        <p role="status">{error ?? "وجّه الكاميرا إلى رمز QR على الشاشة"}</p>
-        <button onClick={onClose}>إغلاق</button>
+        <p role="status">{error ?? labels.prompt}</p>
+        {onClose && <button onClick={onClose}>{labels.close}</button>}
       </div>
     </div>
   );

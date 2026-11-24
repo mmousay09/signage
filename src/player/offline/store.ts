@@ -43,6 +43,8 @@ export interface AssistantAnswer {
 
 export interface ManifestAssistant {
   name: string;
+  /** يجيب بالذكاء الاصطناعي عمّا ليس في الأسئلة الجاهزة */
+  ai?: boolean;
   avatar: ManifestAsset | null;
   answers: AssistantAnswer[];
 }
@@ -50,6 +52,7 @@ export interface ManifestAssistant {
 export interface ManifestKiosk {
   languages: KioskLanguage[];
   registration?: boolean;
+  checkin?: boolean;
   assistant?: ManifestAssistant | null;
   logo: ManifestAsset | null;
   agenda: AgendaEntry[];

@@ -22,6 +22,9 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.view.Gravity
@@ -56,6 +59,8 @@ class MainActivity : Activity() {
     private var cornerTaps = 0
     private var lastCornerTap = 0L
     private var pendingPermission: PermissionRequest? = null
+    private var recognizer: SpeechRecognizer? = null
+    private var pendingListenLocale: String? = null
 
     private val prefs by lazy { getSharedPreferences("player", Context.MODE_PRIVATE) }
     private val playerUrl: String
@@ -267,7 +272,67 @@ class MainActivity : Activity() {
         }
     }
 
+    // ===== سماع سؤال الزائر للمساعد =====
+
+    fun startListening(locale: String): Boolean {
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) return false
+        runOnUiThread {
+            if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                beginRecognition(locale)
+            } else {
+                pendingListenLocale = locale
+                requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), MIC_REQUEST)
+            }
+        }
+        return true
+    }
+
+    fun stopListening() {
+        runOnUiThread {
+            recognizer?.cancel()
+            deliverHeard(null)
+        }
+    }
+
+    private fun beginRecognition(locale: String) {
+        recognizer?.destroy()
+        val next = SpeechRecognizer.createSpeechRecognizer(this)
+        recognizer = next
+        next.setRecognitionListener(object : RecognitionListener {
+            override fun onResults(results: Bundle) =
+                deliverHeard(results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull())
+            override fun onError(error: Int) = deliverHeard(null)
+            override fun onReadyForSpeech(params: Bundle?) = Unit
+            override fun onBeginningOfSpeech() = Unit
+            override fun onRmsChanged(rmsdB: Float) = Unit
+            override fun onBufferReceived(buffer: ByteArray?) = Unit
+            override fun onEndOfSpeech() = Unit
+            override fun onPartialResults(partialResults: Bundle?) = Unit
+            override fun onEvent(eventType: Int, params: Bundle?) = Unit
+        })
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        }
+        next.startListening(intent)
+    }
+
+    private fun deliverHeard(text: String?) {
+        recognizer?.destroy()
+        recognizer = null
+        val value = if (text == null) "null" else JSONObject.quote(text)
+        web.post { web.evaluateJavascript("window.__signageHeard && window.__signageHeard($value)", null) }
+    }
+
     override fun onRequestPermissionsResult(code: Int, permissions: Array<out String>, results: IntArray) {
+        if (code == MIC_REQUEST) {
+            val locale = pendingListenLocale
+            pendingListenLocale = null
+            if (locale != null && results.firstOrNull() == PackageManager.PERMISSION_GRANTED) beginRecognition(locale)
+            else deliverHeard(null)
+            return
+        }
         if (code != CAMERA_REQUEST) return
         val request = pendingPermission ?: return
         pendingPermission = null
@@ -280,6 +345,7 @@ class MainActivity : Activity() {
 
     companion object {
         private const val CAMERA_REQUEST = 7
+        private const val MIC_REQUEST = 8
     }
 }
 
@@ -337,6 +403,13 @@ class SpeechBridge(context: Context, private val web: WebView, private val activ
 
     @JavascriptInterface
     fun captureScreen(): String = activity.captureScreen()
+
+    /** يسمع الزائر بلغة مثل ar-LY؛ النتيجة تصل إلى window.__signageHeard */
+    @JavascriptInterface
+    fun listen(locale: String): Boolean = activity.startListening(locale)
+
+    @JavascriptInterface
+    fun stopListening() = activity.stopListening()
 
     fun shutdown() {
         tts.shutdown()

@@ -2,7 +2,17 @@
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { QrCode } from "@/components/ui/QrCode";
-import { badgeUrl, flushGuestQueue, registerGuest, type GuestInput } from "@/player/kiosk/guests";
+import { QrScanner } from "@/features/screens/QrScanner";
+import { answerQuestion, canListen, listen } from "@/player/kiosk/assistant";
+import {
+  badgeUrl,
+  checkInGuest,
+  flushCheckInQueue,
+  parseBadgeCode,
+  registerGuest,
+  type CheckInResult,
+  type GuestInput,
+} from "@/player/kiosk/guests";
 import { speak, stopSpeaking } from "@/player/audio/speech";
 import {
   dayKey,
@@ -27,7 +37,7 @@ import {
 /** بعد هذه المدة دون لمس تعود الشاشة إلى العرض واللغة الأولى */
 const IDLE_MS = 60_000;
 
-type View = "home" | "program" | "register" | "badge" | "assistant";
+type View = "home" | "program" | "register" | "badge" | "assistant" | "checkin";
 
 interface Badge {
   code: string;
@@ -128,73 +138,314 @@ function askLabel(language: KioskLanguage, name: string) {
   return language === "ar" ? `اسأل ${name}` : language === "fr" ? `Demander à ${name}` : `Ask ${name}`;
 }
 
+/** شخصية المساعد: صورته إن رفعها المالك، وإلا وجه مرسوم. الفم والموجات تتحرك أثناء الكلام */
+function AssistantAvatar({ image, name, state }: { image: string | null; name: string; state: "idle" | "listening" | "thinking" | "speaking" }) {
+  return (
+    <div className="kiosk-avatar" data-state={state} aria-hidden="true">
+      {image ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={image} alt={name} />
+      ) : (
+        <svg viewBox="0 0 120 120">
+          <circle className="avatar-face" cx="60" cy="60" r="56" />
+          <g className="avatar-eyes">
+            <ellipse cx="42" cy="52" rx="6" ry="8" />
+            <ellipse cx="78" cy="52" rx="6" ry="8" />
+          </g>
+          <ellipse className="avatar-mouth" cx="60" cy="82" rx="16" ry="6" />
+        </svg>
+      )}
+      <span className="kiosk-avatar-waves">
+        <i />
+        <i />
+        <i />
+        <i />
+        <i />
+      </span>
+    </div>
+  );
+}
+
 function AssistantView({
   assistant,
+  contractId,
   language,
   text,
 }: {
   assistant: ManifestAssistant;
+  contractId: string;
   language: KioskLanguage;
   text: KioskText;
 }) {
   const avatar = useCachedImage(assistant.avatar);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [speaking, setSpeaking] = useState(false);
-  const chosen = assistant.answers.find((entry) => entry.id === selected);
-  const label = chosen ? localizedAnswer(chosen, language) : null;
+  const [state, setState] = useState<"idle" | "listening" | "thinking" | "speaking">("idle");
+  const [reply, setReply] = useState<{ question: string; answer: string; language: KioskLanguage } | null>(null);
+  const [draft, setDraft] = useState("");
+  const [voiceInput, setVoiceInput] = useState(false);
+  const cancelListening = useRef<(() => void) | null>(null);
+  const turn = useRef(0);
 
-  const say = async (value: string, voice: KioskLanguage) => {
-    setSpeaking(true);
+  // يُعرف بعد التحميل في المتصفح، فلا يختلف ما يُرسم أولًا
+  useEffect(() => setVoiceInput(canListen()), []);
+  useEffect(
+    () => () => {
+      cancelListening.current?.();
+      stopSpeaking();
+    },
+    [],
+  );
+
+  const say = async (value: string, voice: KioskLanguage, current: number) => {
+    setState("speaking");
     await speak(value, voice);
-    setSpeaking(false);
+    if (turn.current === current) setState("idle");
   };
-  useEffect(() => () => stopSpeaking(), []);
+
+  const show = async (question: string, answer: string, answerLanguage: KioskLanguage, current: number) => {
+    setReply({ question, answer, language: answerLanguage });
+    await say(answer, answerLanguage, current);
+  };
+
+  async function ask(raw: string) {
+    const question = raw.trim();
+    if (!question) return;
+    const current = ++turn.current;
+    stopSpeaking();
+    setDraft("");
+    setState("thinking");
+    setReply({ question, answer: "", language });
+    const result = await answerQuestion({
+      contract: contractId,
+      question,
+      answers: assistant.answers,
+      language,
+      ai: Boolean(assistant.ai),
+      noAnswer: (answerLanguage) => textFor(answerLanguage).noAnswer,
+    });
+    if (turn.current !== current) return;
+    await show(question, result.answer, result.language, current);
+  }
+
+  function startListening() {
+    if (state === "listening") {
+      cancelListening.current?.();
+      return;
+    }
+    const current = ++turn.current;
+    stopSpeaking();
+    setState("listening");
+    const session = listen(language);
+    cancelListening.current = session.cancel;
+    void session.result.then((heard) => {
+      cancelListening.current = null;
+      if (turn.current !== current) return;
+      if (heard) void ask(heard);
+      else setState("idle");
+    });
+  }
+
+  const status =
+    state === "listening" ? text.listening : state === "thinking" ? text.thinking : text.greeting.replace("{name}", assistant.name);
 
   return (
     <section className="kiosk-assistant" dir={dirFor(language)}>
-      <header data-speaking={speaking}>
-        {avatar ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={avatar} alt={assistant.name} />
-        ) : (
-          <span className="kiosk-assistant-initial" aria-hidden="true">{assistant.name.slice(0, 1)}</span>
-        )}
+      <header>
+        <AssistantAvatar image={avatar} name={assistant.name} state={state} />
         <div>
-          <h1>{text.greeting.replace("{name}", assistant.name)}</h1>
-          <p>{text.chooseQuestion}</p>
+          <h1 aria-live="polite">{status}</h1>
+          <p>{voiceInput ? text.speakQuestion : text.askPlaceholder}</p>
         </div>
       </header>
 
-      {label && (
-        <div className="kiosk-answer" aria-live="polite">
-          <strong>{label.question}</strong>
-          <p>{label.answer}</p>
-          <button type="button" onClick={() => void say(label.answer, label.answerLanguage)} disabled={speaking}>
-            {text.listenAgain}
+      <form
+        className="kiosk-ask"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void ask(draft);
+        }}
+      >
+        {voiceInput && (
+          <button
+            type="button"
+            className="kiosk-mic"
+            aria-pressed={state === "listening"}
+            aria-label={text.speakQuestion}
+            onClick={startListening}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="9" y="3" width="6" height="11" rx="3" />
+              <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" />
+            </svg>
           </button>
+        )}
+        <input
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          placeholder={text.askPlaceholder}
+          maxLength={300}
+          autoComplete="off"
+          enterKeyHint="send"
+        />
+        <button type="submit" disabled={!draft.trim() || state === "thinking"}>
+          {text.ask}
+        </button>
+      </form>
+
+      {reply && (
+        <div className="kiosk-answer" aria-live="polite" dir={dirFor(reply.language)}>
+          <strong>{reply.question}</strong>
+          {reply.answer ? (
+            <>
+              <p>{reply.answer}</p>
+              <button
+                type="button"
+                onClick={() => void say(reply.answer, reply.language, ++turn.current)}
+                disabled={state === "speaking"}
+              >
+                {text.listenAgain}
+              </button>
+            </>
+          ) : (
+            <p className="kiosk-thinking">
+              <i />
+              <i />
+              <i />
+            </p>
+          )}
         </div>
       )}
 
-      <ul className="kiosk-questions">
-        {assistant.answers.map((entry) => {
-          const item = localizedAnswer(entry, language);
-          return (
-            <li key={entry.id}>
-              <button
-                type="button"
-                aria-pressed={entry.id === selected}
-                onClick={() => {
-                  setSelected(entry.id);
-                  stopSpeaking();
-                  void say(item.answer, item.answerLanguage);
-                }}
-              >
-                {item.question}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+      {assistant.answers.length > 0 && (
+        <>
+          <p className="kiosk-questions-title">{text.orChoose}</p>
+          <ul className="kiosk-questions">
+            {assistant.answers.map((entry) => {
+              const item = localizedAnswer(entry, language);
+              return (
+                <li key={entry.id}>
+                  <button
+                    type="button"
+                    aria-pressed={reply?.question === item.question}
+                    onClick={() => {
+                      const current = ++turn.current;
+                      stopSpeaking();
+                      void show(item.question, item.answer, item.answerLanguage, current);
+                    }}
+                  >
+                    {item.question}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
+    </section>
+  );
+}
+
+/** الزائر يعرض رمز بطاقته أمام كاميرا الشاشة، أو يكتب الرمز */
+function CheckInView({
+  contractId,
+  language,
+  text,
+}: {
+  contractId: string;
+  language: KioskLanguage;
+  text: KioskText;
+}) {
+  const [result, setResult] = useState<CheckInResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [code, setCode] = useState("");
+  const [cameraFailed, setCameraFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => () => clearTimeout(resetTimer.current), []);
+
+  const next = () => {
+    clearTimeout(resetTimer.current);
+    setResult(null);
+    setCode("");
+    setAttempt((value) => value + 1);
+  };
+
+  async function submit(raw: string) {
+    if (busy || result) return;
+    const parsed = parseBadgeCode(raw);
+    setBusy(true);
+    const outcome: CheckInResult = parsed ? await checkInGuest(contractId, parsed) : { status: "not_found" };
+    setBusy(false);
+    setResult(outcome);
+    const name = outcome.name ?? "";
+    if ((outcome.status === "checked_in" || outcome.status === "already") && name) {
+      void speak(text.checkinWelcome.replace("{name}", name).split("،")[0], language);
+    }
+    resetTimer.current = setTimeout(next, outcome.status === "checked_in" || outcome.status === "already" ? 5_000 : 7_000);
+  }
+
+  const success = result && (result.status === "checked_in" || result.status === "already" || result.status === "queued");
+  const message = !result
+    ? null
+    : result.status === "checked_in"
+      ? text.checkinWelcome.replace("{name}", result.name ?? "")
+      : result.status === "already"
+        ? text.checkinAlready.replace("{name}", result.name ?? "")
+        : result.status === "queued"
+          ? text.checkinQueued
+          : result.status === "other_event"
+            ? text.checkinOtherEvent
+            : result.status === "closed"
+              ? text.closed
+              : text.checkinNotFound;
+
+  return (
+    <section className="kiosk-checkin" dir={dirFor(language)}>
+      <h1>{text.checkinTitle}</h1>
+      {result ? (
+        <div className="kiosk-checkin-result" data-ok={Boolean(success)} role="status">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            {success ? <path d="M5 12.5 10 17.5 19.5 7" /> : <path d="M7 7l10 10M17 7 7 17" />}
+          </svg>
+          <p>{message}</p>
+          <button type="button" onClick={next}>{text.checkinNext}</button>
+        </div>
+      ) : (
+        <>
+          {!cameraFailed && (
+            <QrScanner
+              key={attempt}
+              facing="user"
+              className="kiosk-scanner"
+              labels={{ prompt: text.checkinScan, denied: text.checkinNoCamera, failed: text.checkinNoCamera, close: text.done }}
+              onResult={(value) => void submit(value)}
+              onError={() => setCameraFailed(true)}
+            />
+          )}
+          {cameraFailed && <p className="kiosk-empty">{text.checkinNoCamera}</p>}
+          <form
+            className="kiosk-ask"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submit(code);
+            }}
+          >
+            <input
+              value={code}
+              onChange={(event) => setCode(event.target.value.toUpperCase())}
+              placeholder={text.checkinManual}
+              aria-label={text.checkinManual}
+              maxLength={12}
+              dir="ltr"
+              autoComplete="off"
+              autoCapitalize="characters"
+            />
+            <button type="submit" disabled={busy || code.replace(/\s/g, "").length < 8}>
+              {text.checkinConfirm}
+            </button>
+          </form>
+        </>
+      )}
     </section>
   );
 }
@@ -329,22 +580,26 @@ export function KioskShell({
   const text = textFor(language);
   const hasProgram = kiosk.agenda.length > 0;
   const canRegister = Boolean(kiosk.registration);
-  const assistant = kiosk.assistant && kiosk.assistant.answers.length > 0 ? kiosk.assistant : null;
+  const canCheckIn = Boolean(kiosk.checkin);
+  const assistant =
+    kiosk.assistant && (kiosk.assistant.answers.length > 0 || kiosk.assistant.ai) ? kiosk.assistant : null;
   const [badge, setBadge] = useState<Badge | null>(null);
 
   // التسجيلات المحفوظة دون إنترنت تُرسل عند عودة الاتصال
+  // والحضور المسجل دون إنترنت كذلك
   useEffect(() => {
-    if (!canRegister) return;
-    void import("qrcode").catch(() => undefined); // يُحمَّل مسبقًا لتظهر البطاقة دون إنترنت
-    void flushGuestQueue();
-    const timer = setInterval(() => void flushGuestQueue(), 30_000);
-    const online = () => void flushGuestQueue();
-    window.addEventListener("online", online);
+    if (!canRegister && !canCheckIn) return;
+    if (canRegister) void import("qrcode").catch(() => undefined); // يُحمَّل مسبقًا لتظهر البطاقة دون إنترنت
+    if (canCheckIn) void import("jsqr").catch(() => undefined);
+    const flush = () => void flushCheckInQueue();
+    flush();
+    const timer = setInterval(flush, 30_000);
+    window.addEventListener("online", flush);
     return () => {
       clearInterval(timer);
-      window.removeEventListener("online", online);
+      window.removeEventListener("online", flush);
     };
-  }, [canRegister]);
+  }, [canRegister, canCheckIn]);
 
   const resetIdle = () => {
     clearTimeout(idleTimer.current);
@@ -374,7 +629,9 @@ export function KioskShell({
             }}
           />
         ) : view === "assistant" && assistant ? (
-          <AssistantView assistant={assistant} language={activeLanguage} text={text} />
+          <AssistantView assistant={assistant} contractId={contractId} language={activeLanguage} text={text} />
+        ) : view === "checkin" && canCheckIn ? (
+          <CheckInView contractId={contractId} language={activeLanguage} text={text} />
         ) : view === "badge" && badge ? (
           <BadgeView
             badge={badge}
@@ -437,6 +694,16 @@ export function KioskShell({
               </svg>
               <strong>{text.register}</strong>
               <small>{text.registerHint}</small>
+            </button>
+          )}
+          {canCheckIn && (
+            <button type="button" aria-pressed={view === "checkin"} onClick={() => setView("checkin")}>
+              <svg className="kiosk-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" />
+                <path d="M8 12.5 11 15.5 16.5 9" />
+              </svg>
+              <strong>{text.checkin}</strong>
+              <small>{text.checkinHint}</small>
             </button>
           )}
           {assistant && (

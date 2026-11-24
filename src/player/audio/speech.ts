@@ -12,6 +12,9 @@ interface AndroidBridge {
   setVolume?(level: number): void;
   setPinHash?(hash: string): void;
   captureScreen?(): string;
+  /** يبدأ السماع بلغة مثل ar-LY، والنتيجة تصل إلى window.__signageHeard */
+  listen?(locale: string): boolean;
+  stopListening?(): void;
 }
 
 declare global {

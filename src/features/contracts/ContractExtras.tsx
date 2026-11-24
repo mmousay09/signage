@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/browser";
+import { formatDateTime } from "./format";
 
 type Language = "ar" | "fr" | "en";
 
@@ -16,7 +17,26 @@ export interface ExtrasConfig {
   assistant_enabled: boolean;
   assistant_name: string | null;
   assistant_asset_id: string | null;
+  assistant_ai: boolean;
+  assistant_context: string | null;
+  /** مفتاح الذكاء الاصطناعي مضاف في إعدادات الموقع */
+  ai_ready: boolean;
 }
+
+export interface QuestionRow {
+  id: string;
+  question: string;
+  language: Language;
+  source: "match" | "ai" | "none";
+  answer: string | null;
+  created_at: string;
+}
+
+const SOURCE_LABEL: Record<QuestionRow["source"], string> = {
+  match: "من الأسئلة الجاهزة",
+  ai: "أجاب الذكاء الاصطناعي",
+  none: "بلا جواب",
+};
 
 export interface AnswerRow {
   id: string;
@@ -33,17 +53,24 @@ export function ContractExtras({
   config,
   images,
   answers,
+  questions,
 }: {
   contractId: string;
   orgId: string;
   config: ExtrasConfig;
   images: { id: string; name: string }[];
   answers: AnswerRow[];
+  questions: QuestionRow[];
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [assistantOn, setAssistantOn] = useState(config.assistant_enabled);
+  const [draftQuestion, setDraftQuestion] = useState<{ text: string; key: number } | null>(null);
+  const unanswered = questions.filter((row) => row.source === "none").length;
+  // التواريخ تُعرض بتوقيت جهاز المالك
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   async function finish(error: { message: string } | null, done: string) {
     if (!error) await createClient().rpc("request_contract_resync", { p_contract: contractId });
@@ -77,6 +104,8 @@ export function ContractExtras({
         assistant_enabled: assistantOn,
         assistant_name: String(form.get("assistant_name") ?? "").trim() || null,
         assistant_asset_id: String(form.get("assistant_avatar") ?? "") || null,
+        assistant_ai: assistantOn && form.get("assistant_ai") === "on",
+        assistant_context: String(form.get("assistant_context") ?? "").trim() || null,
       })
       .eq("id", contractId);
     await finish(error, assistantOn ? "حُفظ المساعد" : "أُخفي المساعد من الشاشة");
@@ -106,7 +135,10 @@ export function ContractExtras({
         answer: value("answer"),
         translations,
       });
-    if (!error) formElement.reset();
+    if (!error) {
+      formElement.reset();
+      setDraftQuestion(null);
+    }
     await finish(error, "أُضيف السؤال");
   }
 
@@ -150,7 +182,8 @@ export function ContractExtras({
         <section className="assign-section">
           <h2>المساعد</h2>
           <p className="page-note">
-            زر «اسأل» على الشاشة التفاعلية: يختار الزائر سؤالًا فيظهر الجواب وتنطقه الشاشة. الإجابة بالذكاء الاصطناعي على أي سؤال تحتاج اشتراكًا مدفوعًا، وتُضاف لاحقًا.
+            زر «اسأل» على الشاشة التفاعلية: يسأل الزائر بصوته أو يكتب سؤاله أو يختار من القائمة، فتجيبه الشاشة وتنطق الجواب.
+            يفهم المساعد السؤال حتى لو اختلفت كلماته عن السؤال الجاهز، ويعمل ذلك دون إنترنت.
           </p>
           <form className="form" onSubmit={saveAssistant}>
             <label className="check-inline">
@@ -166,12 +199,32 @@ export function ContractExtras({
                 <label>
                   صورة المساعد
                   <select name="assistant_avatar" defaultValue={config.assistant_asset_id ?? ""}>
-                    <option value="">الحرف الأول من الاسم</option>
+                    <option value="">شخصية مرسومة</option>
                     {images.map((image) => (
                       <option key={image.id} value={image.id}>{image.name}</option>
                     ))}
                   </select>
                 </label>
+                <label className="check-inline">
+                  <input type="checkbox" name="assistant_ai" defaultChecked={config.assistant_ai} />
+                  يجيب بالذكاء الاصطناعي عن الأسئلة غير الموجودة في القائمة
+                </label>
+                {!config.ai_ready && (
+                  <p className="page-note">
+                    الذكاء الاصطناعي يحتاج مفتاحًا يُضاف مرة واحدة في إعدادات الموقع. حتى ذلك، يجيب المساعد من الأسئلة الجاهزة فقط.
+                  </p>
+                )}
+                <label>
+                  معلومات إضافية يعرفها المساعد (اختياري)
+                  <textarea
+                    name="assistant_context"
+                    maxLength={4000}
+                    rows={4}
+                    defaultValue={config.assistant_context ?? ""}
+                    placeholder="مثال: الإنترنت باسم Hall-Guest دون كلمة مرور. المواقف خلف المبنى. الغداء في المطعم بالطابق الأرضي."
+                  />
+                </label>
+                <p className="page-note">يستخدمها الذكاء الاصطناعي مع برنامج الجلسات والأسئلة الجاهزة، ولا يجيب بشيء من خارجها.</p>
               </>
             )}
             <button className="button-quiet-blue" disabled={busy}>حفظ المساعد</button>
@@ -180,7 +233,9 @@ export function ContractExtras({
           {config.assistant_enabled && (
             <>
               <h2>الأسئلة والأجوبة ({answers.length})</h2>
-              {answers.length === 0 && <p className="page-note">يظهر زر المساعد على الشاشة بعد إضافة أول سؤال.</p>}
+              {answers.length === 0 && !config.assistant_ai && (
+                <p className="page-note">يظهر زر المساعد على الشاشة بعد إضافة أول سؤال.</p>
+              )}
               <ul className="schedule-list">
                 {answers.map((row) => (
                   <li key={row.id}>
@@ -197,11 +252,19 @@ export function ContractExtras({
                   </li>
                 ))}
               </ul>
-              <form className="form" onSubmit={addAnswer}>
+              <form className="form" onSubmit={addAnswer} id="new-answer">
                 <h3>سؤال جديد</h3>
                 <label>
                   السؤال
-                  <input name="question" required minLength={2} maxLength={200} placeholder="أين قاعة شحات؟" />
+                  <input
+                    key={draftQuestion?.key ?? 0}
+                    name="question"
+                    required
+                    minLength={2}
+                    maxLength={200}
+                    placeholder="أين قاعة شحات؟"
+                    defaultValue={draftQuestion?.text ?? ""}
+                  />
                 </label>
                 <label>
                   الجواب
@@ -222,6 +285,42 @@ export function ContractExtras({
                 ))}
                 <button className="button-primary" disabled={busy}>إضافة السؤال</button>
               </form>
+
+              <h2>ماذا سأل الزوار ({questions.length})</h2>
+              {questions.length === 0 ? (
+                <p className="page-note">تظهر هنا أسئلة الزوار للمساعد، لتعرف ما يهمهم وتضيف جوابًا لما لم يجد له جوابًا.</p>
+              ) : (
+                <>
+                  {unanswered > 0 && (
+                    <p className="page-note">{unanswered} {unanswered === 1 ? "سؤال" : "أسئلة"} بلا جواب. أضف لها جوابًا لتعرفها الشاشة في المرة القادمة.</p>
+                  )}
+                  <ul className="schedule-list">
+                    {questions.map((row) => (
+                      <li key={row.id}>
+                        <strong dir="auto">{row.question}</strong>
+                        {row.answer && row.source !== "none" && <p dir="auto">{row.answer}</p>}
+                        <span>
+                          <span className="question-source" data-source={row.source}>{SOURCE_LABEL[row.source]}</span>
+                          {mounted && <> · {formatDateTime(row.created_at)}</>}
+                        </span>
+                        {row.source !== "match" && (
+                          <div className="schedule-actions">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDraftQuestion({ text: row.question, key: Date.now() });
+                                document.getElementById("new-answer")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                              }}
+                            >
+                              أضف جوابًا
+                            </button>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
             </>
           )}
         </section>

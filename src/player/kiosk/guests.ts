@@ -1,5 +1,6 @@
 import { getPlayerClient } from "@/lib/supabase/player";
 import type { KioskLanguage } from "@/player/offline/store";
+export { parseBadgeCode } from "@/lib/badge";
 
 const QUEUE_KEY = "signage-guest-queue";
 const ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
@@ -91,5 +92,85 @@ export async function flushGuestQueue() {
     }
   } finally {
     flushing = false;
+  }
+}
+
+// ===== تسجيل الحضور =====
+
+const CHECKIN_QUEUE_KEY = "signage-checkin-queue";
+
+export type CheckInStatus = "checked_in" | "already" | "not_found" | "other_event" | "queued" | "closed";
+
+export interface CheckInResult {
+  status: CheckInStatus;
+  name?: string;
+}
+
+interface QueuedCheckIn {
+  contract: string;
+  code: string;
+  at: string;
+}
+
+function readCheckIns(): QueuedCheckIn[] {
+  try {
+    return JSON.parse(window.localStorage.getItem(CHECKIN_QUEUE_KEY) ?? "[]") as QueuedCheckIn[];
+  } catch {
+    return [];
+  }
+}
+
+function writeCheckIns(queue: QueuedCheckIn[]) {
+  try {
+    window.localStorage.setItem(CHECKIN_QUEUE_KEY, JSON.stringify(queue.slice(-1000)));
+  } catch {
+    // التخزين ممتلئ
+  }
+}
+
+async function sendCheckIn(item: QueuedCheckIn): Promise<CheckInResult | "retry"> {
+  const { data, error } = await getPlayerClient().rpc("check_in_guest", {
+    p_contract: item.contract,
+    p_code: item.code,
+    p_at: item.at,
+  });
+  if (error) return error.code && FINAL_ERRORS.has(error.code) ? { status: "closed" } : "retry";
+  const result = data as { status: CheckInStatus; full_name?: string };
+  return { status: result.status, name: result.full_name };
+}
+
+/** دون إنترنت يُحفظ المسح بوقته ويُرسل لاحقًا، فلا يُرَدّ ضيف عند الباب */
+export async function checkInGuest(contract: string, code: string): Promise<CheckInResult> {
+  // الضيف المسجل على هذه الشاشة ولم يُرسل تسجيله بعد: يُعرف اسمه محليًا
+  const local = readQueue().find((guest) => guest.code === code && guest.contract === contract);
+  const item: QueuedCheckIn = { contract, code, at: new Date().toISOString() };
+  const result = local
+    ? "retry"
+    : await Promise.race([
+        sendCheckIn(item).catch(() => "retry" as const),
+        new Promise<"retry">((resolve) => setTimeout(() => resolve("retry"), 6_000)),
+      ]);
+  if (result !== "retry") return result;
+  if (!readCheckIns().some((entry) => entry.code === code)) writeCheckIns([...readCheckIns(), item]);
+  return { status: "queued", name: local?.full_name };
+}
+
+let flushingCheckIns = false;
+
+export async function flushCheckInQueue() {
+  if (flushingCheckIns) return;
+  flushingCheckIns = true;
+  try {
+    // التسجيلات أولًا، حتى يجد الخادم الضيف قبل تسجيل حضوره
+    await flushGuestQueue();
+    const pendingGuests = new Set(readQueue().map((guest) => guest.code));
+    for (const item of readCheckIns()) {
+      if (pendingGuests.has(item.code)) continue;
+      const result = await sendCheckIn(item);
+      if (result === "retry") break;
+      writeCheckIns(readCheckIns().filter((entry) => entry.code !== item.code));
+    }
+  } finally {
+    flushingCheckIns = false;
   }
 }

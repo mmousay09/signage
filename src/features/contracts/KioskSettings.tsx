@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/browser";
@@ -10,6 +11,7 @@ type Language = "ar" | "fr" | "en";
 export interface KioskConfig {
   interactive: boolean;
   registration_enabled: boolean;
+  checkin_enabled: boolean;
   languages: Language[];
   logo_asset_id: string | null;
 }
@@ -92,6 +94,7 @@ export function KioskSettings({
   // التواريخ تُعرض بتوقيت جهاز المالك، فتنتظر حتى تعمل الصفحة في المتصفح
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  const attended = guests.filter((guest) => guest.checked_in_at).length;
 
   async function finish(error: unknown, done: string) {
     if (!error) await createClient().rpc("request_contract_resync", { p_contract: contractId });
@@ -116,6 +119,7 @@ export function KioskSettings({
         interactive,
         languages: languages.length ? languages : ["ar"],
         registration_enabled: interactive && form.get("registration") === "on",
+        checkin_enabled: interactive && form.get("checkin") === "on",
         logo_asset_id: String(form.get("logo") ?? "") || null,
       })
       .eq("id", contractId);
@@ -160,6 +164,15 @@ export function KioskSettings({
     await finish(error, "أُضيفت الجلسة");
   }
 
+  async function markAttended(code: string) {
+    setBusy(true);
+    setMessage(null);
+    const { error } = await createClient().rpc("check_in_guest", { p_contract: contractId, p_code: code });
+    setBusy(false);
+    setMessage(error ? "لم يُسجَّل الحضور. حاول مرة أخرى." : "سُجّل الحضور");
+    if (!error) router.refresh();
+  }
+
   async function removeSession(id: string) {
     setBusy(true);
     setMessage(null);
@@ -202,6 +215,10 @@ export function KioskSettings({
               <label>
                 <input type="checkbox" name="registration" defaultChecked={config.registration_enabled} />
                 زر «التسجيل» على الشاشة مع بطاقة QR لكل ضيف
+              </label>
+              <label>
+                <input type="checkbox" name="checkin" defaultChecked={config.checkin_enabled} />
+                زر «تسجيل الحضور»: يعرض الضيف بطاقته أمام كاميرا الشاشة
               </label>
             </fieldset>
             <label>
@@ -302,9 +319,17 @@ export function KioskSettings({
         </>
       )}
 
-      {(config.registration_enabled || guests.length > 0) && (
+      {(config.registration_enabled || config.checkin_enabled || guests.length > 0) && (
         <>
           <h2>الضيوف المسجلون ({guests.length})</h2>
+          {guests.length > 0 && (
+            <p className="page-note">
+              حضر {attended} من {guests.length}.{" "}
+              <Link href={`/contracts/${contractId}/checkin`} className="button-quiet-blue">
+                تسجيل الحضور من هاتفك
+              </Link>
+            </p>
+          )}
           {guests.length === 0 ? (
             <p className="page-note">لم يسجل أحد بعد. تظهر هنا تسجيلات الشاشة فور وصولها.</p>
           ) : (
@@ -328,6 +353,15 @@ export function KioskSettings({
                       </a>
                       {mounted && <> · {formatDateTime(guest.created_at)}</>}
                     </span>
+                    <div className="schedule-actions">
+                      {guest.checked_in_at ? (
+                        <span className="guest-attended">حضر{mounted && <> {formatDateTime(guest.checked_in_at)}</>}</span>
+                      ) : (
+                        <button type="button" disabled={busy} onClick={() => void markAttended(guest.badge_code)}>
+                          تسجيل حضوره
+                        </button>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>
