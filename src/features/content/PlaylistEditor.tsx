@@ -118,6 +118,22 @@ export function PlaylistEditor({
     }, showing ? "أُوقف عرض القائمة على الشاشة" : "أُرسلت القائمة إلى الشاشة");
   }
 
+  // عرض القائمة على مجموعة شاشات بضغطة واحدة
+  function showOn(targets: AssignableScreen[], label: string) {
+    const ids = targets.map((screen) => screen.id);
+    if (!ids.length) return;
+    void run(async () => {
+      const client = supabase();
+      const { error } = await client.from("screens").update({ playlist_id: playlist.id }).in("id", ids);
+      if (error) return { error };
+      return client
+        .from("screen_commands")
+        .insert(ids.map((id) => ({ org_id: orgId, screen_id: id, command: "resync" })));
+    }, `أُرسلت القائمة إلى ${label}`);
+  }
+
+  const locations = [...new Set(screens.map((screen) => screen.location?.trim()).filter((value): value is string => Boolean(value)))];
+
   async function publish() {
     setBusy(true);
     const { data, error } = contractId
@@ -255,6 +271,20 @@ export function PlaylistEditor({
           {screens.length === 0 ? (
             <p className="page-note">لا توجد شاشات مربوطة بعد.</p>
           ) : (
+            <>
+            <div className="assign-bulk">
+              <button className="button-primary" type="button" disabled={busy} onClick={() => showOn(screens, "كل الشاشات")}>
+                كل الشاشات ({screens.length})
+              </button>
+              {locations.map((location) => {
+                const members = screens.filter((screen) => screen.location?.trim() === location);
+                return (
+                  <button key={location} className="button-scan" type="button" disabled={busy} onClick={() => showOn(members, `شاشات ${location}`)}>
+                    {location} ({members.length})
+                  </button>
+                );
+              })}
+            </div>
             <ul className="assign-list">
               {screens.map((screen) => {
                 const showing = screen.playlist_id === playlist.id;
@@ -272,6 +302,7 @@ export function PlaylistEditor({
                 );
               })}
             </ul>
+            </>
           )}
         </section>
       )}

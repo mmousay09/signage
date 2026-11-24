@@ -5,6 +5,7 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabaseKey, supabaseUrl } from "@/lib/supabase/config";
 import { getPlayerClient } from "@/lib/supabase/player";
 import { emitAnnouncement, wasAnnounced } from "@/player/announce/engine";
+import { captureSnapshot, getNowPlaying, getVolume } from "@/player/engine/device";
 import { flushPlays } from "@/player/engine/plays";
 import { getAudioState, playChime, type AudioState } from "@/player/audio/audio";
 import {
@@ -15,7 +16,7 @@ import {
   type PlayerManifest,
 } from "@/player/offline/store";
 
-const APP_VERSION = "0.4.0";
+const APP_VERSION = "0.5.0";
 const CLOCK_KEY = "signage-clock-offset";
 const PAIRING_INTERVAL = 3_000;
 const HEARTBEAT_INTERVAL = 30_000;
@@ -161,6 +162,12 @@ export function useScreenConnection(): ScreenConnection {
               if (item.command === "reload") shouldReload = true;
               if (item.command === "identify") await identify();
               if (item.command === "resync") void syncContent();
+              if (item.command === "snapshot") {
+                const image = await captureSnapshot();
+                if (!image) throw new Error("snapshot_failed");
+                const { error: saveError } = await supabase.rpc("save_snapshot", { p_image: image });
+                if (saveError) throw saveError;
+              }
               if (item.command === "clear_cache") {
                 await clearStoredContent();
                 activeVersion = null;
@@ -275,6 +282,8 @@ export function useScreenConnection(): ScreenConnection {
         p_free_bytes: storage.free,
         p_state: {
           content: contentState,
+          now: getNowPlaying(),
+          volume: getVolume(),
           audio: currentAudio,
           wake_lock: Boolean(wakeLock),
           display: `${window.screen.width}x${window.screen.height}`,

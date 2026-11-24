@@ -12,7 +12,7 @@ function ScreenLine({ screen, now }: { screen: ScreenRow; now: number | null }) 
   const disabled = screen.status === "disabled";
   const state = disabled ? "disabled" : online ? "online" : "offline";
   const stateText = disabled ? "موقوفة" : online ? "متصلة" : "غير متصلة";
-  const detail = [screen.location, screen.client_name ?? screen.contract_title]
+  const detail = [screen.client_name ?? screen.contract_title]
     .filter(Boolean)
     .join("، ");
 
@@ -25,7 +25,11 @@ function ScreenLine({ screen, now }: { screen: ScreenRow; now: number | null }) 
           {stateText}
           {!online && !disabled && lastSeenText(screen, now) ? `، ${lastSeenText(screen, now)}` : ""}
         </span>
-        {!disabled && !screen.playlist_id && !screen.contract_title && <span>تعرض إعلان «متاحة للإيجار»</span>}
+        {online && screen.player_state?.now ? (
+          <span className="screen-now">يعرض الآن: {screen.player_state.now.label}</span>
+        ) : (
+          !disabled && !screen.playlist_id && !screen.contract_title && <span>تعرض إعلان «متاحة للإيجار»</span>
+        )}
         {online && screen.player_state?.audio === "blocked" && (
           <span className="screen-warning">الصوت يحتاج لمسة على الشاشة</span>
         )}
@@ -90,6 +94,15 @@ export function ScreenBoard({ orgId, initialScreens }: { orgId: string; initialS
 
   const active = screens.filter((screen) => screen.status === "active");
   const onlineCount = active.filter((screen) => isOnline(screen, now)).length;
+  // الشاشات مجمعة حسب الموقع، والتي بلا موقع في الآخر
+  const byLocation = new Map<string, ScreenRow[]>();
+  screens.forEach((screen) => {
+    const key = screen.location?.trim() || "بدون موقع";
+    byLocation.set(key, [...(byLocation.get(key) ?? []), screen]);
+  });
+  const groups = [...byLocation].sort(([a], [b]) =>
+    a === "بدون موقع" ? 1 : b === "بدون موقع" ? -1 : a.localeCompare(b, "ar"),
+  );
 
   return (
     <main className="board">
@@ -102,11 +115,23 @@ export function ScreenBoard({ orgId, initialScreens }: { orgId: string; initialS
       {screens.length === 0 ? (
         <p className="board-empty">افتح رابط المشغّل على شاشة أندرويد، ثم اربطها برمزها.</p>
       ) : (
-        <ul className="screen-list">
-          {screens.map((screen) => (
-            <ScreenLine key={screen.id} screen={screen} now={now} />
-          ))}
-        </ul>
+        groups.map(([location, members]) => (
+          <section key={location} className="screen-group" aria-label={location}>
+            {groups.length > 1 && (
+              <h2>
+                {location}
+                <small>
+                  {members.filter((screen) => isOnline(screen, now)).length} من {members.length} متصلة
+                </small>
+              </h2>
+            )}
+            <ul className="screen-list">
+              {members.map((screen) => (
+                <ScreenLine key={screen.id} screen={screen} now={now} />
+              ))}
+            </ul>
+          </section>
+        ))
       )}
 
       <div className="thumb-bar">

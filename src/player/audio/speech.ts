@@ -1,12 +1,17 @@
 // صوت الجهاز: تطبيق أندرويد الخاص بالمنظومة إن وُجد، وإلا صوت المتصفح.
 // في المرحلة 5 يحل محله صوت ElevenLabs المحفوظ.
 
+import { getVolume } from "@/player/engine/device";
+
 type SpeechLanguage = "ar" | "fr" | "en";
 type SpeechResult = "spoken" | "no_voice" | "failed";
 
 interface AndroidBridge {
   speak(id: string, text: string, language: string): boolean;
   stopSpeaking(): void;
+  setVolume?(level: number): void;
+  setPinHash?(hash: string): void;
+  captureScreen?(): string;
 }
 
 declare global {
@@ -87,6 +92,7 @@ export async function speak(rawText: string, language: SpeechLanguage = "ar"): P
     utterance.voice = voice;
     utterance.lang = voice.lang;
     utterance.rate = 0.95;
+    utterance.volume = getVolume() / 100;
     let settled = false;
     const finish = (result: "spoken" | "failed") => {
       if (settled) return;

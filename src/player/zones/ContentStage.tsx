@@ -1,5 +1,6 @@
 "use client";
 
+import { getVolume, setNowPlaying } from "@/player/engine/device";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { getAssetUrl, type ManifestProgram } from "@/player/offline/store";
 
@@ -76,14 +77,15 @@ export function ContentStage({
         : (item.duration_ms ?? DEFAULT_ITEM_MS);
     const timer = setTimeout(() => advanceRef.current(), duration);
     const started = Date.now();
+    const position = playback.content.program.items.indexOf(item) + 1;
+    const label =
+      item.kind === "text"
+        ? `نص: ${(item.body ?? "").slice(0, 60)}`
+        : (item.asset?.name ?? `${item.kind === "video" ? "فيديو" : "صورة"} رقم ${position}`);
+    if (!missing) setNowPlaying({ kind: item.kind, label });
     return () => {
       clearTimeout(timer);
       if (missing) return;
-      const position = playback.content.program.items.indexOf(item) + 1;
-      const label =
-        item.kind === "text"
-          ? `نص: ${(item.body ?? "").slice(0, 60)}`
-          : `${item.kind === "video" ? "فيديو" : "صورة"} رقم ${position}`;
       onPlayedRef.current?.(item.id, label, Math.min(Date.now() - started, duration));
     };
   }, [item, ready, missing, playback.tick, playback.content]);
@@ -92,7 +94,8 @@ export function ContentStage({
     const video = videoRef.current;
     if (!video || item?.kind !== "video" || !media?.url) return;
     video.currentTime = 0;
-    video.muted = false;
+    video.volume = getVolume() / 100;
+    video.muted = getVolume() === 0;
     video.play().catch(() => {
       // إذا منع المتصفح الصوت يستمر الفيديو دون صوت
       video.muted = true;

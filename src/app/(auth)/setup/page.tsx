@@ -18,7 +18,7 @@ export default function SetupPage() {
     if (rpcError) {
       setError(
         rpcError.message.includes("organization_already_exists")
-          ? "الشركة مسجلة بحساب آخر. اطلب من مالك الحساب إضافتك."
+          ? "الشركة مسجلة بحساب آخر. اطلب من صاحب الحساب رابط دعوة من صفحة «الفريق»، أو ادخل بالبريد الذي سجلت به أول مرة."
           : "تعذر حفظ الشركة. تأكد من الاتصال وحاول مرة أخرى.",
       );
       setBusy(false);

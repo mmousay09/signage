@@ -6,4 +6,6 @@
     <string name="save">حفظ</string>
     <string name="reload">إعادة التحميل</string>
     <string name="exit">خروج</string>
+    <string name="pin_title">أدخل رمز إعدادات الشاشة</string>
+    <string name="open">فتح</string>
 </resources>

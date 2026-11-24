@@ -30,6 +30,7 @@ export interface NamedOption {
 export interface AssignableScreen {
   id: string;
   name: string | null;
+  location?: string | null;
   playlist_id: string | null;
 }
 

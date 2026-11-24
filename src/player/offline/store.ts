@@ -6,6 +6,7 @@ export interface ManifestAsset {
   mime: string;
   size: number;
   duration_ms: number | null;
+  name?: string;
 }
 
 export interface ManifestItem {
@@ -86,6 +87,9 @@ export interface PlayerManifest {
   contracts?: ManifestContract[];
   schedules?: ManifestSchedule[];
   screen_id?: string;
+  rotation?: 0 | 90 | 180 | 270;
+  volume?: number;
+  pin_hash?: string | null;
   pronunciations?: { term: string; spoken: string }[];
   program: ManifestProgram;
 }

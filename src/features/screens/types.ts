@@ -15,6 +15,8 @@ export interface ScreenRow {
   free_bytes: number | null;
   player_state: {
     content?: { status?: string; ready?: number; total?: number; error?: string };
+    now?: { kind: string; label: string } | null;
+    volume?: number;
     audio?: "ready" | "blocked" | "unknown";
     wake_lock?: boolean;
     display?: string;

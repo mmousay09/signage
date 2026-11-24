@@ -7,7 +7,16 @@ import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
+import android.media.AudioManager
+import android.text.InputType
+import android.util.Base64
+import java.io.ByteArrayOutputStream
+import java.security.MessageDigest
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -68,7 +77,7 @@ class MainActivity : Activity() {
             webViewClient = PlayerClient()
             webChromeClient = PlayerChrome()
         }
-        speech = SpeechBridge(this, web)
+        speech = SpeechBridge(this, web, this)
         web.addJavascriptInterface(speech, "SignageAndroid")
 
         val corner = View(this).apply {
@@ -146,6 +155,22 @@ class MainActivity : Activity() {
     }
 
     private fun showSettings() {
+        val hash = prefs.getString("pin_hash", "") ?: ""
+        if (hash.isEmpty()) return openSettings()
+        val pin = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.pin_title)
+            .setView(pin)
+            .setPositiveButton(R.string.open) { _, _ ->
+                if (sha256(pin.text.toString()) == hash) openSettings()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun openSettings() {
         val input = EditText(this).apply {
             setText(playerUrl)
             setSingleLine()
@@ -163,6 +188,44 @@ class MainActivity : Activity() {
             .setNegativeButton(R.string.exit) { _, _ -> finishAffinity() }
             .show()
     }
+
+    /** رمز الإعدادات يُضبط من لوحة التحكم ويصل مع بيانات الشاشة */
+    fun savePinHash(hash: String) {
+        prefs.edit().putString("pin_hash", if (Regex("^[0-9a-f]{64}$").matches(hash)) hash else "").apply()
+    }
+
+    fun captureScreen(): String {
+        val latch = CountDownLatch(1)
+        var result = ""
+        runOnUiThread {
+            try {
+                val width = web.width.coerceAtLeast(1)
+                val height = web.height.coerceAtLeast(1)
+                val scale = 720f / maxOf(width, height)
+                val bitmap = Bitmap.createBitmap((width * scale).toInt(), (height * scale).toInt(), Bitmap.Config.RGB_565)
+                val canvas = Canvas(bitmap)
+                canvas.scale(scale, scale)
+                web.draw(canvas)
+                val out = ByteArrayOutputStream()
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 70, out)
+                bitmap.recycle()
+                result = "data:image/jpeg;base64," + Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
+            } finally {
+                latch.countDown()
+            }
+        }
+        latch.await(3, TimeUnit.SECONDS)
+        return result
+    }
+
+    fun setSystemVolume(level: Int) {
+        val audio = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        audio.setStreamVolume(AudioManager.STREAM_MUSIC, (max * level.coerceIn(0, 100)) / 100, 0)
+    }
+
+    private fun sha256(value: String): String =
+        MessageDigest.getInstance("SHA-256").digest(value.toByteArray()).joinToString("") { "%02x".format(it) }
 
     private fun scheduleRetry() {
         handler.removeCallbacksAndMessages(null)
@@ -221,7 +284,7 @@ class MainActivity : Activity() {
 }
 
 /** محرك الكلام في أندرويد، تستدعيه الصفحة عبر window.SignageAndroid */
-class SpeechBridge(context: Context, private val web: WebView) {
+class SpeechBridge(context: Context, private val web: WebView, private val activity: MainActivity) {
     private var ready = false
     private val tts: TextToSpeech = TextToSpeech(context.applicationContext) { status ->
         ready = status == TextToSpeech.SUCCESS
@@ -261,6 +324,19 @@ class SpeechBridge(context: Context, private val web: WebView) {
     fun stopSpeaking() {
         tts.stop()
     }
+
+    @JavascriptInterface
+    fun setVolume(level: Int) {
+        activity.runOnUiThread { activity.setSystemVolume(level) }
+    }
+
+    @JavascriptInterface
+    fun setPinHash(hash: String) {
+        activity.savePinHash(hash)
+    }
+
+    @JavascriptInterface
+    fun captureScreen(): String = activity.captureScreen()
 
     fun shutdown() {
         tts.shutdown()

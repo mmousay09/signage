@@ -19,7 +19,7 @@ export default async function PlaylistPage({ params }: { params: Promise<{ id: s
     supabase.from("playlist_items").select("*").eq("playlist_id", id).order("position"),
     supabase
       .from("screens")
-      .select("id, name, playlist_id")
+      .select("id, name, location, playlist_id")
       .eq("org_id", org.id)
       .eq("status", "active")
       .order("name"),

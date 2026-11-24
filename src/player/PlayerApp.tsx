@@ -9,6 +9,7 @@ import { resolveContent } from "@/player/engine/schedule";
 import { registerPlayerWorker } from "@/player/offline/store";
 import { useScreenConnection } from "@/player/sync/useScreenConnection";
 import { setPronunciations } from "@/player/audio/speech";
+import { setPinHash, setVolume } from "@/player/engine/device";
 import { recordPlay } from "@/player/engine/plays";
 import { KioskShell } from "@/player/kiosk/KioskShell";
 import { ContentStage } from "@/player/zones/ContentStage";
@@ -36,6 +37,11 @@ export function PlayerApp() {
   const pronunciations = screen.manifest?.pronunciations;
   useEffect(() => setPronunciations(pronunciations), [pronunciations]);
 
+  const volume = screen.manifest?.volume;
+  const pinHash = screen.manifest?.pin_hash;
+  useEffect(() => setVolume(volume), [volume]);
+  useEffect(() => setPinHash(pinHash), [pinHash]);
+
   const handleTouch = async () => {
     screen.setAudio(await unlockAudio());
     if (!document.fullscreenElement) {
@@ -44,7 +50,12 @@ export function PlayerApp() {
   };
 
   return (
-    <main className="player" data-phase={screen.phase} onPointerDown={handleTouch}>
+    <main
+      className="player"
+      data-phase={screen.phase}
+      data-rotation={screen.manifest?.rotation ?? 0}
+      onPointerDown={handleTouch}
+    >
       <audio id="player-chime" src="/sounds/chime.wav" preload="auto" />
 
       {resolved && resolved.kind !== "available" && screen.manifest && (() => {
