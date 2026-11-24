@@ -45,9 +45,11 @@ export async function captureSnapshot(): Promise<string | null> {
 
   const root = document.querySelector<HTMLElement>(".player");
   if (!root) return null;
-  const portrait = root.clientHeight >= root.clientWidth;
-  const w = portrait ? 405 : 720;
-  const h = portrait ? 720 : 405;
+  // نفس نسبة الشاشة تمامًا حتى لا تتمدد النصوص، وأطول ضلع 720 نقطة
+  const rootBox = root.getBoundingClientRect();
+  const longest = Math.max(rootBox.width, rootBox.height) || 1;
+  const w = Math.max(1, Math.round((rootBox.width / longest) * 720));
+  const h = Math.max(1, Math.round((rootBox.height / longest) * 720));
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
