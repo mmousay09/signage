@@ -324,7 +324,7 @@ export function KioskSettings({
           <h2>الضيوف المسجلون ({guests.length})</h2>
           {guests.length > 0 && (
             <p className="page-note">
-              حضر {attended} من {guests.length}.{" "}
+              {`حضر ${attended} من ${guests.length}.`}{" "}
               <Link href={`/contracts/${contractId}/checkin`} className="button-quiet-blue">
                 تسجيل الحضور من هاتفك
               </Link>

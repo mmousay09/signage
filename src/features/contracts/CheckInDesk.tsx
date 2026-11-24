@@ -70,7 +70,7 @@ export function CheckInDesk({
       <Link href={`/contracts/${contractId}`}>رجوع إلى العقد</Link>
       <h1>تسجيل الحضور</h1>
       <p className="page-note">
-        {title}: حضر <strong>{count}</strong> من {total}.
+        {`${title}: حضر ${count} من ${total}.`}
       </p>
 
       {latest && (

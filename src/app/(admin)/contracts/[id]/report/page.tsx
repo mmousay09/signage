@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { PrintButton } from "@/features/contracts/PrintButton";
 import { getAdminContext } from "@/lib/admin";
@@ -19,13 +20,16 @@ interface Report {
   generated_at: string;
 }
 
+// الأرقام لاتينية في اللغتين، والتواريخ بالإنجليزية إن اختار المستخدم الواجهة الإنجليزية
 const number = new Intl.NumberFormat("ar-LY-u-nu-latn");
-const dateTime = new Intl.DateTimeFormat("ar-LY-u-nu-latn", {
-  timeZone: "Africa/Tripoli",
-  dateStyle: "long",
-  timeStyle: "short",
-});
-const day = new Intl.DateTimeFormat("ar-LY-u-nu-latn", { timeZone: "UTC", weekday: "long", day: "numeric", month: "long" });
+
+function formats(english: boolean) {
+  const locale = english ? "en-GB" : "ar-LY-u-nu-latn";
+  return {
+    dateTime: new Intl.DateTimeFormat(locale, { timeZone: "Africa/Tripoli", dateStyle: "long", timeStyle: "short" }),
+    day: new Intl.DateTimeFormat(locale, { timeZone: "UTC", weekday: "long", day: "numeric", month: "long" }),
+  };
+}
 
 function duration(ms: number) {
   if (ms < 60_000) return `${number.format(Math.round(ms / 1000))} ثانية`;
@@ -39,6 +43,7 @@ function duration(ms: number) {
 export default async function ContractReportPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { supabase } = await getAdminContext();
+  const { dateTime, day } = formats((await cookies()).get("admin_lang")?.value === "en");
   const { data, error } = await supabase.rpc("contract_report", { p_contract: id });
   if (error || !data) notFound();
   const report = data as Report;

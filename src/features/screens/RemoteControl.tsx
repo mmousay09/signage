@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { uiLocale } from "@/lib/locale";
 import { createClient } from "@/lib/supabase/browser";
 
 export interface RemoteSettings {
@@ -22,7 +23,10 @@ const ROTATIONS: { value: RemoteSettings["rotation"]; label: string }[] = [
   { value: 180, label: "قلب رأسًا على عقب" },
 ];
 
-const timeFormat = new Intl.DateTimeFormat("ar-LY-u-nu-latn", { timeZone: "Africa/Tripoli", timeStyle: "short", dateStyle: "short" });
+const timeFormat = {
+  format: (date: Date) =>
+    new Intl.DateTimeFormat(uiLocale(), { timeZone: "Africa/Tripoli", timeStyle: "short", dateStyle: "short" }).format(date),
+};
 
 export function RemoteControl({
   screenId,

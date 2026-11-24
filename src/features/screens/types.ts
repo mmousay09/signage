@@ -1,3 +1,4 @@
+import { uiLocale } from "@/lib/locale";
 export interface ScreenRow {
   id: string;
   org_id: string;
@@ -38,7 +39,7 @@ export function lastSeenText(screen: ScreenRow, now: number | null) {
   if (!screen.last_seen_at) return "لم تتصل بعد";
   if (now === null) return "";
   const minutes = Math.round((Date.parse(screen.last_seen_at) - now) / 60_000);
-  const format = new Intl.RelativeTimeFormat("ar-LY", { numeric: "auto" });
+  const format = new Intl.RelativeTimeFormat(uiLocale("ar-LY"), { numeric: "auto" });
   if (minutes > -60) return `آخر اتصال ${format.format(Math.min(minutes, 0), "minute")}`;
   if (minutes > -1440) return `آخر اتصال ${format.format(Math.round(minutes / 60), "hour")}`;
   return `آخر اتصال ${format.format(Math.round(minutes / 1440), "day")}`;

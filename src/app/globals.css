@@ -921,6 +921,12 @@
     font-weight: 600;
   }
   .admin-header a { color: inherit; text-decoration: none; }
+  .auth-language { display: flex; justify-content: flex-end; padding: 0.75rem 1rem 0; }
+  .auth-language .language-toggle { min-height: 2.75rem; border: 0; background: none; }
+  .language-toggle { font: inherit; font-weight: 500; color: inherit; cursor: pointer; }
+  .language-toggle-en, html[lang="en"] .language-toggle-ar { display: none; }
+  html[lang="en"] .language-toggle-en { display: inline; }
+  html.i18n-pending body { visibility: hidden; }
   .admin-header button { min-height: 2.75rem; border: 0; background: none; padding-inline: 0.25rem; }
   .admin-header-actions { display: flex; align-items: center; gap: 1rem; font-weight: 500; }
 

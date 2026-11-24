@@ -1,3 +1,5 @@
+import { uiLocale } from "@/lib/locale";
+
 export type ContractStatus = "draft" | "confirmed" | "cancelled";
 
 export function contractState(status: ContractStatus, startsAt: string, endsAt: string, now: number) {
@@ -9,7 +11,7 @@ export function contractState(status: ContractStatus, startsAt: string, endsAt: 
 }
 
 export const formatDateTime = (value: string) =>
-  new Intl.DateTimeFormat("ar-LY", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  new Intl.DateTimeFormat(uiLocale("ar-LY"), { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 
 export function toLocalInput(value: string) {
   const date = new Date(value);

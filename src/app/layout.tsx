@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="ar" dir="rtl" className={readex.variable}>
+    <html lang="ar" dir="rtl" className={readex.variable} suppressHydrationWarning>
       <body>{children}</body>
     </html>
   );
