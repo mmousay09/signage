@@ -121,7 +121,7 @@ export function ScreenBoard({ orgId, initialScreens }: { orgId: string; initialS
               <h2>
                 {location}
                 <small>
-                  {members.filter((screen) => isOnline(screen, now)).length} من {members.length} متصلة
+                  {`${members.filter((screen) => isOnline(screen, now)).length} من ${members.length} متصلة`}
                 </small>
               </h2>
             )}
